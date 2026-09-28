@@ -6,6 +6,7 @@ import { parsePack, serializePack, nextItemId, nfc, type Pack } from '../../src/
 import { zipToPack } from '../../src/core/zip';
 import type { Message } from '../../src/core/pipeline';
 import { EditHistory } from './history';
+import { legacyRegion, unmatchedRegionText } from '../../src/core/region-label';
 
 const DISPLAY_MAX = 1600;
 export const editHistory = new EditHistory();
@@ -44,10 +45,20 @@ function reviewMessages(pack: Pack, messages: Message[]): Message[] {
   for (const item of pack.items) {
     if (item.needsReview && !kept.some((m) => m.code === 'NEEDS_REVIEW' && m.itemId === item.id)) {
       kept.push({ level: 'warning', code: 'NEEDS_REVIEW', itemId: item.id, file: item.file,
-        text: `"${item.file}" (${item.id}) eşleşmesi zayıf (skor ${item.matchScore}); yerini kontrol et.` });
+        text: `"${item.file.split('/').pop()}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` });
     }
   }
-  return kept;
+  let marker = 0;
+  return kept.map((m) => {
+    if (m.code === 'NEEDS_REVIEW') return { ...m,
+      text: `"${m.file?.split('/').pop() ?? m.itemId}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` };
+    if (m.code !== 'UNMATCHED_REGION') return m;
+    const region = m.region ?? legacyRegion(m.text);
+    if (!region) return m;
+    marker++;
+    return { ...m, region, marker,
+      text: unmatchedRegionText(region, pack.designSize.widthPx, pack.designSize.heightPx, marker) };
+  });
 }
 
 export function visibleMessages(): Message[] {

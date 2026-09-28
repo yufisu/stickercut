@@ -33,7 +33,7 @@ export function background(w = 800, h = 1200): Raster {
   return paint(w, h, (x, y) => ((x * 7 + y * 13) % 97 === 0 ? [90, 120, 60, 255] : BG));
 }
 
-export interface ScenePlacement { file: string; x: number; y: number; scale: number }
+export interface ScenePlacement { file: string; x: number; y: number; scale: number; rotationDeg?: number }
 export const PLACEMENTS: ScenePlacement[] = [
   { file: 'cay.png', x: 220, y: 260, scale: 0.5 },
   { file: 'kahve.png', x: 580, y: 280, scale: 0.6 },
@@ -47,7 +47,7 @@ export function makeScene(placements: ScenePlacement[] = PLACEMENTS) {
   const design = cloneRaster(bg);
   for (const p of placements) {
     const s = stickers.find((st) => st.file === p.file)!.raster;
-    drawRaster(design, s, itemMatrix({ ...p, rotationDeg: 0 }, s.width, s.height));
+    drawRaster(design, s, itemMatrix({ ...p, rotationDeg: p.rotationDeg ?? 0 }, s.width, s.height));
   }
   return { design, background: bg, stickers };
 }

@@ -31,6 +31,36 @@ describe('prepareLoadedFile', () => {
 });
 
 describe('initPack', () => {
+  it('dönen tekrarları tek PNG ile iki öğe yapar ve kaynak kullanımını bildirir', () => {
+    const s = makeScene([
+      { file: 'kullanilmayan.png', x: 230, y: 300, scale: 0.6, rotationDeg: 20 },
+      { file: 'kullanilmayan.png', x: 590, y: 880, scale: 0.5, rotationDeg: -15 },
+    ]);
+    const files = [
+      prepareLoadedFile('tasarim.png', EMPTY, s.design),
+      prepareLoadedFile('arka.png', EMPTY, s.background),
+      ...s.stickers.map((st) => prepareLoadedFile(st.file, EMPTY, st.raster)),
+    ];
+    const res = initPack(files, { page: { widthMm: 80 } });
+    expect(res.pack?.items.filter((i) => i.file === 'kullanilmayan.png')).toHaveLength(2);
+    expect(res.pack?.items.map((i) => i.rotationDeg).sort((a, b) => a - b)).toEqual([-15, 20]);
+    expect(res.messages.find((m) => m.code === 'REUSED_STICKER')?.text).toContain('2 ayrı kesim çizgisi');
+  });
+
+  it('eksik çizimi koordinat yerine numaralı bölge olarak bildirir', () => {
+    const s = makeScene([{ file: 'baklava.png', x: 220, y: 880, scale: 0.5 }]);
+    const files = [
+      prepareLoadedFile('tasarim.png', EMPTY, s.design),
+      prepareLoadedFile('arka.png', EMPTY, s.background),
+    ];
+    const res = initPack(files, { page: { widthMm: 80 } });
+    const region = res.messages.find((m) => m.code === 'UNMATCHED_REGION');
+    expect(region?.region).toBeDefined();
+    expect(region?.marker).toBe(1);
+    expect(region?.text).toContain('turuncu 1 işaretine');
+    expect(region?.text).not.toContain('x=');
+  });
+
   it('sahneden 4 öğeli paket kurar, kullanılmayanı bildirir', () => {
     const res = initPack(sceneFiles(), { page: { widthMm: 80 } });
     expect(res.pack!.items).toHaveLength(4);

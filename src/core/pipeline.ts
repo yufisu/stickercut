@@ -6,12 +6,13 @@ import { type RoleResult, assignRoles, transparencyRatio } from './roles';
 import { type MatchOptions, matchStickers } from './match';
 import { cloneRaster, compositeOverWhite, downscaleRaster, drawRaster, strokePolyline } from './render';
 import { checkLayout } from './checks';
+import { unmatchedRegionText } from './region-label';
 import { buildPdf, type PdfAsset } from './pdf';
 
 export interface Asset { width: number; height: number; raster: Raster }
 export interface LoadedFile extends Asset { name: string; bytes: Uint8Array }
 export type Level = 'error' | 'warning' | 'info';
-export interface Message { level: Level; code: string; text: string; itemId?: string; file?: string }
+export interface Message { level: Level; code: string; text: string; itemId?: string; file?: string; region?: BBox; marker?: number }
 export interface InitOptions {
   design?: string;
   background?: string;
@@ -79,7 +80,7 @@ export function initPack(files: LoadedFile[], opts: InitOptions = {}): InitResul
         x: round(m.x, 2),
         y: round(m.y, 2),
         scale: round((m.scale * f.raster.width) / f.width, 6),
-        rotationDeg: 0,
+        rotationDeg: round(m.rotationDeg, 2),
         printOnly: false,
         needsReview: m.needsReview,
         matchScore: round(m.score, 3),
@@ -90,15 +91,23 @@ export function initPack(files: LoadedFile[], opts: InitOptions = {}): InitResul
   for (const item of pack.items) {
     if (item.needsReview) {
       messages.push({ level: 'warning', code: 'NEEDS_REVIEW', itemId: item.id, file: item.file,
-        text: `"${item.file}" (${item.id}) eşleşmesi zayıf (skor ${item.matchScore}); yerini kontrol et.` });
+        text: `"${item.file.split('/').pop()}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` });
     }
   }
   for (const file of result.unusedStickers) {
-    messages.push({ level: 'warning', code: 'UNUSED_STICKER', file, text: `"${file}" tasarımda bulunamadı (kullanılmıyor olabilir).` });
+    messages.push({ level: 'warning', code: 'UNUSED_STICKER', file,
+      text: `"${file.split('/').pop()}" için güvenilir bir yer bulunamadı. Tasarımda varsa Sticker ekle bölümünden yerleştir.` });
   }
-  for (const b of result.unmatchedRegions) {
-    messages.push({ level: 'warning', code: 'UNMATCHED_REGION',
-      text: `Tasarımda eşleşmeyen bir bölge var (x=${b.x}, y=${b.y}, ${b.w}×${b.h} px); bu sticker’ın PNG’si eksik olabilir.` });
+  const usage = new Map<string, number>();
+  for (const item of pack.items) usage.set(item.file, (usage.get(item.file) ?? 0) + 1);
+  for (const [file, count] of usage) if (count > 1) {
+    messages.push({ level: 'info', code: 'REUSED_STICKER', file,
+      text: `"${file.split('/').pop()}" tasarımda ${count} kez kullanılıyor; tek PNG’den ${count} ayrı kesim çizgisi oluşturuldu.` });
+  }
+  for (const [index, b] of result.unmatchedRegions.entries()) {
+    const marker = index + 1;
+    messages.push({ level: 'warning', code: 'UNMATCHED_REGION', region: b, marker,
+      text: unmatchedRegionText(b, design.width, design.height, marker) });
   }
   return { pack, roles, unmatchedRegions: result.unmatchedRegions, messages };
 }

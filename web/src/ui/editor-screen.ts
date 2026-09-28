@@ -114,7 +114,7 @@ export function mountEditor(root: HTMLElement): () => void {
   function renderStatus(): void {
     const all = [...visibleMessages(), ...state.cutMessages];
     $('#warnings').innerHTML = all.length
-      ? all.map((m) => `<li class="${m.level}"${m.itemId ? ` data-item="${esc(m.itemId)}"` : ''}>${esc(m.text)}</li>`).join('')
+      ? all.map((m) => `<li class="${m.level}"${m.itemId ? ` data-item="${esc(m.itemId)}"` : ''}${m.marker ? ` data-region="${m.marker}"` : ''}${m.code === 'UNUSED_STICKER' && m.file ? ` data-add-file="${esc(m.file)}"` : ''}>${esc(m.text)}</li>`).join('')
       : '<li class="info">Sorun yok.</li>';
     $('#busy').textContent = state.busy ?? '';
     for (const b of root.querySelectorAll<HTMLButtonElement>('.actions button')) b.disabled = !!state.busy;
@@ -202,6 +202,17 @@ export function mountEditor(root: HTMLElement): () => void {
     if (!pack) return;
     const warning = t.closest<HTMLElement>('li[data-item]');
     if (warning) { state.selectedId = warning.dataset.item!; editHistory.select(state.selectedId); renderSettings(); view.draw(); return; }
+    const regionWarning = t.closest<HTMLElement>('li[data-region]');
+    if (regionWarning) { view.focusRegion(Number(regionWarning.dataset.region)); return; }
+    const unusedWarning = t.closest<HTMLElement>('li[data-add-file]');
+    if (unusedWarning) {
+      const select = $<HTMLSelectElement>('#addFile');
+      if ([...select.options].some((o) => o.value === unusedWarning.dataset.addFile)) {
+        select.value = unusedWarning.dataset.addFile!;
+        select.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+      return;
+    }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     const item = pack.items.find((i) => i.id === state.selectedId);
     if (act === 'approve' && item) { item.needsReview = false; commit(); renderSettings(); }

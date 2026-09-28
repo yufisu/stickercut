@@ -8,6 +8,7 @@ const HANDLE_PX = 22;
 const ROTATE_OFFSET_PX = 36;
 
 export class CanvasView {
+  private focusedRegion: number | null = null;
   readonly el: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
   private s = 1;
@@ -83,6 +84,36 @@ export class CanvasView {
       g.strokeStyle = '#e00000';
       for (const [id, pts] of state.cuts) if (!this.drag || this.drag.id !== id) g.stroke(new Path2D(closedPathSvg(pts)));
     }
+    const focusedRegion = state.messages.find((m) => m.code === 'UNMATCHED_REGION' && m.marker === this.focusedRegion)?.region;
+    if (focusedRegion) {
+      g.save();
+      g.fillStyle = 'rgba(28, 25, 20, .42)';
+      g.beginPath();
+      g.rect(0, 0, dw, dh);
+      g.rect(focusedRegion.x, focusedRegion.y, focusedRegion.w, focusedRegion.h);
+      g.fill('evenodd');
+      g.restore();
+    }
+    for (const m of state.messages) {
+      if (m.code !== 'UNMATCHED_REGION' || !m.region || !m.marker) continue;
+      const { x, y, w, h } = m.region;
+      const focused = m.marker === this.focusedRegion;
+      g.save();
+      g.fillStyle = focused ? 'rgba(255, 140, 0, .28)' : 'rgba(255, 140, 0, .14)';
+      g.fillRect(x, y, w, h);
+      g.strokeStyle = focused ? '#bd5100' : '#e08a00';
+      g.lineWidth = (focused ? 3 : 2) / this.s;
+      g.setLineDash(focused ? [] : [7 / this.s, 4 / this.s]);
+      g.strokeRect(x, y, w, h);
+      g.setLineDash([]);
+      const cx = x + w / 2, cy = y + h / 2, radius = 13 / this.s;
+      g.beginPath(); g.arc(cx, cy, radius, 0, Math.PI * 2);
+      g.fillStyle = focused ? '#bd5100' : '#e08a00'; g.fill();
+      g.fillStyle = '#fff'; g.font = `bold ${14 / this.s}px system-ui`;
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(String(m.marker), cx, cy);
+      g.restore();
+    }
     for (const item of pack.items) {
       const geo = this.geom(item);
       if (!geo) continue;
@@ -110,6 +141,11 @@ export class CanvasView {
     }
   }
 
+  focusRegion(marker: number): void {
+    this.focusedRegion = marker;
+    this.draw();
+  }
+
   private hit(p: Pt): string | null {
     const items = state.pack!.items;
     for (let i = items.length - 1; i >= 0; i--) {
@@ -128,6 +164,7 @@ export class CanvasView {
 
   private down = (e: PointerEvent): void => {
     if (!state.pack) return;
+    this.focusedRegion = null;
     const p = this.toDesign(e);
     const sel = state.pack.items.find((i) => i.id === state.selectedId);
     const selGeo = sel && this.geom(sel);

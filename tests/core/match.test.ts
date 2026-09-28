@@ -31,6 +31,23 @@ describe('matchStickers', () => {
     expect(res.unmatchedRegions).toHaveLength(1);
   });
 
+  it('aynı PNG’nin farklı açılardaki iki kopyasını ayrı ayrı bulur', () => {
+    const placements = [
+      { file: 'kullanilmayan.png', x: 230, y: 300, scale: 0.6, rotationDeg: 20 },
+      { file: 'kullanilmayan.png', x: 590, y: 880, scale: 0.5, rotationDeg: -15 },
+    ];
+    const { design, background, stickers } = makeScene(placements);
+    const res = matchStickers(design, background, stickers);
+    expect(res.items).toHaveLength(2);
+    expect(res.unmatchedRegions).toEqual([]);
+    for (const expected of placements) {
+      const item = res.items.find((i) => Math.hypot(i.x - expected.x, i.y - expected.y) < 5);
+      expect(item?.file).toBe(expected.file);
+      expect(item!.rotationDeg).toBeCloseTo(expected.rotationDeg, 0);
+      expect(item!.scale).toBeCloseTo(expected.scale, 2);
+    }
+  });
+
   it('tasarımdaki şeffaf alanlar (RGB çöp) sahte bölge üretmez', () => {
     const { background, stickers } = makeScene([]);
     const design = cloneRaster(background);
