@@ -152,6 +152,8 @@ export function mountEditor(root: HTMLElement): () => void {
   renderSettings();
   renderStatus();
   view.draw();
-  const unsub = subscribe(() => { renderStatus(); view.draw(); });
+  // The screen router runs first in the same update() batch. If it unmounts this
+  // editor, the copied listener must not access elements that are now gone.
+  const unsub = subscribe(() => { if (!view.el.isConnected) return; renderStatus(); view.draw(); });
   return () => { ac.abort(); unsub(); view.destroy(); };
 }
