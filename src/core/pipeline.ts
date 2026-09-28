@@ -6,6 +6,7 @@ import { type RoleResult, assignRoles, transparencyRatio } from './roles';
 import { type MatchOptions, matchStickers } from './match';
 import { cloneRaster, compositeOverWhite, downscaleRaster, drawRaster, strokePolyline } from './render';
 import { checkLayout } from './checks';
+import { buildPdf, type PdfAsset } from './pdf';
 
 export interface Asset { width: number; height: number; raster: Raster }
 export interface LoadedFile extends Asset { name: string; bytes: Uint8Array }
@@ -161,4 +162,21 @@ export function renderPackPreview(pack: Pack, assets: Map<string, Asset>, cuts: 
     strokePolyline(out, [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY }, { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY }], true, [255, 140, 0], 4);
   }
   return out;
+}
+
+export async function buildPackPdf(
+  pack: Pack, files: Map<string, LoadedFile>, cache?: CutCache,
+): Promise<{ pdf: Uint8Array | null; messages: Message[] }> {
+  const { cuts, messages } = computeCuts(pack, files, cache);
+  const needed = new Set([pack.files.background, ...pack.items.map((i) => i.file)]);
+  const assets = new Map<string, PdfAsset>();
+  for (const name of needed) {
+    const f = files.get(name);
+    if (f) assets.set(name, { bytes: f.bytes, width: f.width, height: f.height });
+    else if (name === pack.files.background) {
+      messages.push({ level: 'error', code: 'MISSING_FILE', file: name, text: `Arka plan dosyası "${name}" projede yok.` });
+    }
+  }
+  if (messages.some((m) => m.level === 'error')) return { pdf: null, messages };
+  return { pdf: await buildPdf({ pack, assets, cuts }), messages };
 }
