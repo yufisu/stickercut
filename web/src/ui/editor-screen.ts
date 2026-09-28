@@ -6,7 +6,15 @@ import { esc } from './html';
 export function mountEditor(root: HTMLElement): () => void {
   root.innerHTML = `
     <div class="editor">
-      <div class="stage-wrap" id="stage"></div>
+      <div class="stage-wrap" id="stage">
+        <div class="stage-tools" role="group" aria-label="Görsel yakınlaştırma">
+          <button id="zoomOut" type="button" aria-label="Uzaklaştır">−</button>
+          <output id="zoomLevel" aria-live="off">100%</output>
+          <button id="zoomIn" type="button" aria-label="Yakınlaştır">+</button>
+          <button id="zoomFit" type="button">Sığdır</button>
+        </div>
+        <div class="stage-hint">⌘/Ctrl + kaydır: yakınlaştır · Shift + sürükle: gez</div>
+      </div>
       <aside class="panel">
         <div id="settings"></div>
         <section><h2>Uyarılar</h2><ul id="warnings" class="msgs"></ul></section>
@@ -25,7 +33,7 @@ export function mountEditor(root: HTMLElement): () => void {
   const view = new CanvasView($('#stage'), () => { commit(); renderSettings(); }, () => {
     editHistory.select(state.selectedId);
     renderSettings();
-  });
+  }, (percent) => { $('#zoomLevel').textContent = `${percent}%`; });
 
   function deleteSelected(): void {
     const pack = state.pack;
@@ -230,8 +238,17 @@ export function mountEditor(root: HTMLElement): () => void {
   }, { signal: ac.signal });
   $('#undo').addEventListener('click', () => moveHistory('undo'), { signal: ac.signal });
   $('#redo').addEventListener('click', () => moveHistory('redo'), { signal: ac.signal });
+  $('#zoomOut').addEventListener('click', () => view.zoomBy(1 / 1.25), { signal: ac.signal });
+  $('#zoomIn').addEventListener('click', () => view.zoomBy(1.25), { signal: ac.signal });
+  $('#zoomFit').addEventListener('click', () => view.fit(), { signal: ac.signal });
   window.addEventListener('keydown', (e) => {
     if (!root.isConnected || state.screen !== 'editor' || !state.pack) return;
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && ['Equal', 'Minus', 'Digit0'].includes(e.code)) {
+      e.preventDefault();
+      if (e.code === 'Digit0') view.fit();
+      else view.zoomBy(e.code === 'Equal' ? 1.25 : 1 / 1.25);
+      return;
+    }
     const key = e.key.toLowerCase();
     if ((e.metaKey || e.ctrlKey) && (key === 'z' || (!e.metaKey && key === 'y'))) {
       e.preventDefault();

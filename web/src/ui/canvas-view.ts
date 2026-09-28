@@ -6,6 +6,8 @@ import { corners, containsPoint, handles, hitHandle, moved, scaled, rotated, typ
 type Mode = 'move' | 'scale' | 'rotate';
 const HANDLE_PX = 22;
 const ROTATE_OFFSET_PX = 36;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 8;
 
 export class CanvasView {
   private focusedRegion: number | null = null;
@@ -14,12 +16,19 @@ export class CanvasView {
   private s = 1;
   private ox = 0;
   private oy = 0;
+  private zoom = 1;
+  private panX = 0;
+  private panY = 0;
+  private panning: { pointerId: number; x: number; y: number } | null = null;
   private drag: { id: string; mode: Mode; start: Pt; orig: Geom } | null = null;
   private ro: ResizeObserver;
 
-  constructor(private parent: HTMLElement, private onCommit: () => void, private onSelect: () => void) {
+  constructor(private parent: HTMLElement, private onCommit: () => void, private onSelect: () => void,
+    private onZoom: (percent: number) => void) {
     this.el = document.createElement('canvas');
     this.el.className = 'stage';
+    this.el.tabIndex = 0;
+    this.el.setAttribute('aria-label', 'Sticker çalışma alanı');
     parent.append(this.el);
     this.g = this.el.getContext('2d')!;
     this.ro = new ResizeObserver(() => this.draw());
@@ -28,9 +37,40 @@ export class CanvasView {
     this.el.addEventListener('pointermove', this.move);
     this.el.addEventListener('pointerup', this.up);
     this.el.addEventListener('pointercancel', this.up);
+    this.el.addEventListener('wheel', this.wheel, { passive: false });
+    this.el.addEventListener('contextmenu', this.contextMenu);
   }
 
-  destroy(): void { this.ro.disconnect(); this.el.remove(); }
+  destroy(): void {
+    this.ro.disconnect();
+    this.el.removeEventListener('wheel', this.wheel);
+    this.el.removeEventListener('contextmenu', this.contextMenu);
+    this.el.remove();
+  }
+
+  get zoomPercent(): number { return Math.round(this.zoom * 100); }
+
+  zoomBy(factor: number, x = this.parent.clientWidth / 2, y = this.parent.clientHeight / 2): void {
+    if (!state.pack) return;
+    this.layout();
+    const atX = (x - this.ox) / this.s, atY = (y - this.oy) / this.s;
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.zoom * factor));
+    if (next === this.zoom) return;
+    this.zoom = next;
+    this.layout();
+    this.panX += x - (this.ox + atX * this.s);
+    this.panY += y - (this.oy + atY * this.s);
+    this.draw();
+    this.onZoom(this.zoomPercent);
+  }
+
+  fit(): void {
+    this.zoom = 1;
+    this.panX = 0;
+    this.panY = 0;
+    this.draw();
+    this.onZoom(this.zoomPercent);
+  }
 
   private geom(item: Item): Geom | null {
     const f = state.files.get(item.file);
@@ -49,9 +89,9 @@ export class CanvasView {
     const [cw, ch] = [Math.round(r.width * dpr), Math.round(r.height * dpr)];
     if (this.el.width !== cw || this.el.height !== ch) { this.el.width = cw; this.el.height = ch; }
     const pad = 16, { widthPx: dw, heightPx: dh } = pack.designSize;
-    this.s = Math.max(0.01, Math.min((r.width - 2 * pad) / dw, (r.height - 2 * pad) / dh));
-    this.ox = (r.width - this.s * dw) / 2;
-    this.oy = (r.height - this.s * dh) / 2;
+    this.s = Math.max(0.01, Math.min((r.width - 2 * pad) / dw, (r.height - 2 * pad) / dh)) * this.zoom;
+    this.ox = (r.width - this.s * dw) / 2 + this.panX;
+    this.oy = (r.height - this.s * dh) / 2 + this.panY;
   }
 
   draw(): void {
@@ -164,6 +204,14 @@ export class CanvasView {
 
   private down = (e: PointerEvent): void => {
     if (!state.pack) return;
+    this.el.focus({ preventScroll: true });
+    if (e.button === 1 || e.shiftKey) {
+      e.preventDefault();
+      this.panning = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      this.el.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (e.button !== 0) return;
     this.focusedRegion = null;
     const p = this.toDesign(e);
     const sel = state.pack.items.find((i) => i.id === state.selectedId);
@@ -180,6 +228,13 @@ export class CanvasView {
   };
 
   private move = (e: PointerEvent): void => {
+    if (this.panning?.pointerId === e.pointerId) {
+      this.panX += e.clientX - this.panning.x;
+      this.panY += e.clientY - this.panning.y;
+      this.panning = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      this.draw();
+      return;
+    }
     if (!this.drag || !state.pack) return;
     const item = state.pack.items.find((i) => i.id === this.drag!.id);
     if (!item) return;
@@ -190,7 +245,11 @@ export class CanvasView {
     this.draw();
   };
 
-  private up = (): void => {
+  private up = (e: PointerEvent): void => {
+    if (this.panning?.pointerId === e.pointerId) {
+      this.panning = null;
+      return;
+    }
     if (!this.drag || !state.pack) return;
     const item = state.pack.items.find((i) => i.id === this.drag!.id);
     const changed = item && (item.x !== this.drag.orig.x || item.y !== this.drag.orig.y || item.scale !== this.drag.orig.scale || item.rotationDeg !== this.drag.orig.rotationDeg);
@@ -203,4 +262,21 @@ export class CanvasView {
       this.onCommit();
     } else this.draw();
   };
+
+  private wheel = (e: WheelEvent): void => {
+    if (!state.pack) return;
+    e.preventDefault();
+    const scale = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+      : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? this.parent.clientHeight : 1;
+    if (e.ctrlKey || e.metaKey) {
+      const r = this.el.getBoundingClientRect();
+      this.zoomBy(Math.exp(-e.deltaY * scale * 0.002), e.clientX - r.left, e.clientY - r.top);
+    } else {
+      this.panX -= e.deltaX * scale;
+      this.panY -= e.deltaY * scale;
+      this.draw();
+    }
+  };
+
+  private contextMenu = (e: MouseEvent): void => { if (e.shiftKey) e.preventDefault(); };
 }

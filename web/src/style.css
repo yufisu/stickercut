@@ -37,6 +37,11 @@ label.check input { width: 22px; height: 22px; }
 .editor { display: grid; grid-template-columns: minmax(0, 1fr) 340px; width: 100%; height: 100%; min-width: 0; min-height: 0; }
 .stage-wrap { position: relative; overflow: hidden; min-width: 0; min-height: 0; }
 .stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.stage-tools { position: absolute; z-index: 1; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: rgb(255 255 255 / 95%); box-shadow: 0 3px 14px rgb(39 35 31 / 10%); }
+.stage-tools button { min-height: 36px; height: 36px; padding: 0 10px; border: 0; background: transparent; }
+.stage-tools button:hover { background: var(--bg); }
+.stage-tools output { min-width: 48px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.stage-hint { position: absolute; z-index: 1; left: 16px; top: 16px; padding: 5px 9px; border-radius: 8px; background: rgb(255 255 255 / 88%); color: var(--muted); font-size: 12px; pointer-events: none; }
 .panel { overflow-y: auto; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); padding: 16px; display: grid; gap: 20px; align-content: start; }
 .panel section { display: grid; gap: 10px; }
 .panel h2 { margin: 0; font-size: 15px; }
