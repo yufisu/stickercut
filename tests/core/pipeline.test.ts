@@ -85,7 +85,7 @@ describe('computeCuts', () => {
     expect(Math.abs(r.reduce((a, b) => a + b, 0) / r.length - 110)).toBeLessThan(2);
   });
 
-  it('printOnly öğeleri kesmez; eksik dosya ve şeffafsız PNG için hata verir', () => {
+  it('printOnly öğeleri kesmez; eksik dosyayı bildirir, opak PNG’yi keser', () => {
     const files = sceneFiles();
     const { pack } = initPack(files, { page: { widthMm: 80 } });
     pack!.items[0].printOnly = true;
@@ -94,7 +94,8 @@ describe('computeCuts', () => {
     pack!.items[2].file = 'opak.png';
     const { cuts, messages } = computeCuts(pack!, assetsOf([...files, opaque]));
     expect(cuts.has(pack!.items[0].id)).toBe(false);
-    expect(messages.filter((m) => m.level === 'error').map((m) => m.code).sort()).toEqual(['MISSING_FILE', 'NO_ALPHA']);
+    expect(cuts.get(pack!.items[2].id)).toHaveLength(4);
+    expect(messages.filter((m) => m.level === 'error').map((m) => m.code)).toEqual(['MISSING_FILE']);
   });
 });
 

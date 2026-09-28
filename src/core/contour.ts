@@ -119,7 +119,16 @@ export function simplifyClosed(pts: Pt[], eps: number): Pt[] {
 
 export function stickerCutShape(r: Raster, o: CutShapeOptions): CutShape {
   if (isFullyOpaque(r)) {
-    throw new StickerError('NO_ALPHA', 'Bu PNG’de şeffaf alan yok, kesim çizgisi çıkarılamıyor.');
+    // Tam dolu görselde alfa sınırı yoktur; PNG'nin dış kenarı kesim sınırıdır.
+    // Offset, bu dikdörtgenin dört kenarını aynı miktarda dışarı taşırır.
+    const offset = Math.max(0, o.offsetPx);
+    const start = offset === 0 ? 0 : -offset;
+    return { points: [
+      { x: start, y: start },
+      { x: r.width + offset, y: start },
+      { x: r.width + offset, y: r.height + offset },
+      { x: start, y: r.height + offset },
+    ], extraPartsRatio: 0 };
   }
   const f = Math.min(1, (o.maxWorkSize ?? 1024) / Math.max(r.width, r.height));
   const small = downscaleMask(alphaMask(r, o.alphaThreshold), f);

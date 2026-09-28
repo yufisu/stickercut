@@ -59,4 +59,17 @@ describe('buildPackPdf', () => {
     expect(pdf).toBeNull();
     expect(messages.some((m) => m.code === 'MISSING_FILE')).toBe(true);
   });
+
+  it('tam opak sticker için PDF kesim sayfasına kapalı yol ekler', async () => {
+    const files = sceneFiles();
+    const opaque = { width: 20, height: 30, data: new Uint8ClampedArray(20 * 30 * 4).fill(255) };
+    files.push(prepareLoadedFile('opak.png', encodePng(opaque), opaque));
+    const { pack } = initPack(files, { page: { widthMm: 80 } });
+    pack!.items[0].file = 'opak.png';
+    const { pdf, messages } = await buildPackPdf(pack!, new Map(files.map((f) => [f.name, f])));
+    expect(messages.some((m) => m.code === 'NO_ALPHA')).toBe(false);
+    expect(pdf).not.toBeNull();
+    const cut = pageContent(await PDFDocument.load(pdf!), 1);
+    expect(cut.match(/\bh\b/g)).toHaveLength(4);
+  });
 });

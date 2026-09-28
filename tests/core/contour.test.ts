@@ -92,9 +92,14 @@ describe('stickerCutShape', () => {
     expect(stickerCutShape(r, opts).extraPartsRatio).toBeGreaterThan(0.3);
   });
 
-  it('şeffaflığı olmayan PNG için NO_ALPHA hatası', () => {
-    expect(() => stickerCutShape(raster(50, () => 255), opts)).toThrowError(StickerError);
-    try { stickerCutShape(raster(50, () => 255), opts); } catch (e) { expect((e as StickerError).code).toBe('NO_ALPHA'); }
+  it('tam opak PNG için görüntü kenarından dikdörtgen kesim yolu üretir', () => {
+    expect(stickerCutShape(raster(50, () => 255), opts)).toEqual({
+      points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 0, y: 50 }],
+      extraPartsRatio: 0,
+    });
+    expect(stickerCutShape(raster(50, () => 255), { ...opts, offsetPx: 5 }).points).toEqual([
+      { x: -5, y: -5 }, { x: 55, y: -5 }, { x: 55, y: 55 }, { x: -5, y: 55 },
+    ]);
   });
 
   it('tamamen şeffaf PNG için EMPTY hatası', () => {
