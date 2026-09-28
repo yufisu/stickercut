@@ -1,5 +1,7 @@
 # stickercut Implementation Plan
 
+**Güncel durum (2026-09-28):** Task 1–15 kodu tamamlandı ve test edildi. Web sürümü `https://yufisu.github.io/stickercut/` adresinde yayında. GitHub Pages, `gh-pages` dalından yayın yapıyor; yeni sürümler için `npm run publish:pages` kullanılıyor. Mevcut GitHub CLI oturumu `workflow` kapsamına sahip olmadığı için aşağıdaki Task 16 GitHub Actions taslağı uygulanmadı. Gerçek kahve pack'inde üç baklava kaynak PNG'si eksik; bu üç düşük skorlu yerleşim kullanıcı incelemesi gerektiriyor. Fiziksel iPad Safari ve Illustrator kontrolü henüz yapılmadı.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Sticker pack PNG'lerinden (tam tasarım + arka plan + tek tek sticker'lar) otomatik yerleşim ve kesim çizgisi çıkaran, 2 sayfalı (baskı + kesim) PDF üreten; iPad'de tarayıcıdan, Mac'te ve agent'larda CLI'dan çalışan araç.
@@ -4365,4 +4367,3 @@ Yusuf'tan iste:
 
 Global CLAUDE.md gereği: düzeltmeler kullanıcıdan gelirse `tasks/lessons.md`'ye Hata + Neden + Kural ekle.
 ````
-
