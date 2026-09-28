@@ -32,11 +32,9 @@ describe('geometry', () => {
     close(apply(m, { x: 20, y: 0 }), { x: 5, y: 10 });
   });
 
-  it('closedPathSvg n nokta için n kübik segment üretir', () => {
+  it('closedPathSvg dik köşeleri dışarı taşırmadan kapalı kontur üretir', () => {
     const d = closedPathSvg([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }]);
-    expect(d.startsWith('M 0 0')).toBe(true);
-    expect(d.endsWith('Z')).toBe(true);
-    expect(d.match(/C/g)).toHaveLength(4);
+    expect(d).toBe('M 0 0 L 10 0 L 10 10 L 0 10 Z');
     expect(closedPathSvg([{ x: 0, y: 0 }])).toBe('');
   });
 

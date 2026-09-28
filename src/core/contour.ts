@@ -33,7 +33,7 @@ const dirIndex = (dx: number, dy: number) => {
   return -1;
 };
 
-/** Moore komşuluk takibi (Jacob durdurma kuralı). Tek bileşenli, delikleri dolu maske beklenir. */
+/** Moore komşuluk takibi. Başlangıca ilk dönüşte kapanır; geri komşu yönü değişebilir. */
 export function traceBoundary(m: Mask): Pt[] {
   const { width: w, height: h, data } = m;
   const on = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && data[y * w + x] === 1;
@@ -61,7 +61,7 @@ export function traceBoundary(m: Mask): Pt[] {
       break;
     }
     if (!moved) break;
-    if (x === sx && y === sy && back === 0) break;
+    if (x === sx && y === sy) break;
   }
   return pts;
 }

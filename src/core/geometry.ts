@@ -37,18 +37,12 @@ export function itemMatrix(p: Placement, w: number, h: number): Affine {
 
 const fmt = (v: number) => String(Math.round(v * 1000) / 1000);
 
-/** Kapalı Catmull-Rom spline'ı kübik bezier SVG path'ine çevirir (affine dönüşüme göre değişmez). */
+/** Kontur noktalarını aynen izler. Spline, dik köşelerde kontrol noktalarını dışarı taşırır. */
 export function closedPathSvg(pts: Pt[]): string {
-  const n = pts.length;
-  if (n < 3) return '';
-  let d = `M ${fmt(pts[0].x)} ${fmt(pts[0].y)}`;
-  for (let i = 0; i < n; i++) {
-    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C ${fmt(c1x)} ${fmt(c1y)} ${fmt(c2x)} ${fmt(c2y)} ${fmt(p2.x)} ${fmt(p2.y)}`;
-  }
-  return d + ' Z';
+  if (pts.length < 3) return '';
+  return `M ${fmt(pts[0].x)} ${fmt(pts[0].y)}`
+    + pts.slice(1).map((p) => ` L ${fmt(p.x)} ${fmt(p.y)}`).join('')
+    + ' Z';
 }
 
 export function polygonBounds(pts: Pt[]): { minX: number; minY: number; maxX: number; maxY: number } {

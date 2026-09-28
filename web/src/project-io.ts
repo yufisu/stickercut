@@ -5,8 +5,25 @@ import { shareOrDownload } from './share';
 import { parsePack, serializePack, nextItemId, nfc, type Pack } from '../../src/core/project';
 import { zipToPack } from '../../src/core/zip';
 import type { Message } from '../../src/core/pipeline';
+import { EditHistory } from './history';
 
 const DISPLAY_MAX = 1600;
+export const editHistory = new EditHistory();
+
+function restoreEdit(snapshot: { pack: Pack; selectedId: string | null } | null): void {
+  if (!snapshot) return;
+  update((s) => {
+    s.pack = snapshot.pack;
+    s.selectedId = snapshot.selectedId;
+    s.cuts = new Map();
+    s.cutMessages = [];
+  });
+  scheduleCuts();
+  scheduleAutosave();
+}
+
+export function undoEdit(): void { restoreEdit(editHistory.undo()); }
+export function redoEdit(): void { restoreEdit(editHistory.redo()); }
 
 function reviewMessages(pack: Pack, messages: Message[]): Message[] {
   const kept = messages.filter((m) => {
@@ -96,6 +113,7 @@ export async function place(): Promise<void> {
     page: { widthMm: state.page.widthMm, heightMm: state.page.heightMm ?? undefined },
   }));
   if (!res) return;
+  if (res.pack) editHistory.reset(res.pack);
   update((s) => {
     s.messages = res.messages;
     if (res.pack) { s.pack = res.pack; s.screen = 'editor'; s.selectedId = null; s.cuts = new Map(); }
@@ -107,6 +125,7 @@ let cutTimer = 0;
 let cutSeq = 0;
 export function scheduleCuts(): void {
   clearTimeout(cutTimer);
+  ++cutSeq; // Önceki hesaplamanın sonucu yeni düzenlemeyi geçersiz kılamaz.
   cutTimer = window.setTimeout(() => void recomputeCuts(), 150);
 }
 export async function recomputeCuts(): Promise<void> {
@@ -120,7 +139,8 @@ export async function recomputeCuts(): Promise<void> {
 
 /** Pack değiştiğinde çağrılır. */
 export function commit(): void {
-  update();
+  if (state.pack) editHistory.record(state.pack, state.selectedId);
+  update((s) => { s.cutMessages = []; });
   scheduleCuts();
   scheduleAutosave();
 }
@@ -152,6 +172,7 @@ async function importZip(bytes: Uint8Array): Promise<void> {
   state.files.clear();
   const roleOf = (n: string): Role => (n === pack.files.design ? 'design' : n === pack.files.background ? 'background' : 'sticker');
   await registerFiles([...files].map(([name, b]) => ({ name, bytes: b, role: roleOf(nfc(name)) })));
+  editHistory.reset(pack);
   update((s) => { s.pack = pack; s.screen = 'editor'; s.selectedId = null; s.messages = reviewMessages(pack, []); });
   await recomputeCuts();
   scheduleAutosave();
@@ -181,6 +202,7 @@ export async function newProject(): Promise<void> {
   await saveQueue;
   await storage.clear();
   for (const f of state.files.values()) f.bitmap.close();
+  editHistory.reset(null);
   update((s) => {
     s.files = new Map(); s.pack = null; s.cuts = new Map(); s.messages = []; s.cutMessages = [];
     s.selectedId = null; s.screen = 'files';
@@ -193,6 +215,7 @@ export async function restore(): Promise<void> {
   await busy('Kaldığın yerden açılıyor…', async () => {
     await registerFiles(saved.files);
     const pack = saved.packJson ? parsePack(saved.packJson) : null;
+    editHistory.reset(pack);
     update((s) => { s.page = saved.page; s.pack = pack; s.screen = pack ? 'editor' : 'files';
       s.messages = pack ? reviewMessages(pack, saved.messages ?? []) : saved.messages ?? []; });
     if (pack) await recomputeCuts();

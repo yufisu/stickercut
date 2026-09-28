@@ -1,5 +1,5 @@
 import { state, subscribe, update } from '../state';
-import { commit, addStickerItem, addNewPng, exportPdf, exportZip, newProject, visibleMessages } from '../project-io';
+import { commit, addStickerItem, addNewPng, editHistory, undoEdit, redoEdit, exportPdf, exportZip, newProject, visibleMessages } from '../project-io';
 import { CanvasView } from './canvas-view';
 import { esc } from './html';
 
@@ -11,6 +11,7 @@ export function mountEditor(root: HTMLElement): () => void {
         <div id="settings"></div>
         <section><h2>Uyarılar</h2><ul id="warnings" class="msgs"></ul></section>
         <section class="actions">
+          <div class="grid2"><button id="undo" title="⌘Z">Geri al</button><button id="redo" title="⌘⇧Z">Yinele</button></div>
           <button id="pdf" class="primary">PDF oluştur</button>
           <button id="zip">Projeyi dışa aktar (.zip)</button>
           <button id="new" class="danger">Yeni proje</button>
@@ -21,7 +22,27 @@ export function mountEditor(root: HTMLElement): () => void {
     <input type="file" id="addPick" accept=".png,.PNG,image/png" hidden />`;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
   const settings = $('#settings');
-  const view = new CanvasView($('#stage'), () => { commit(); renderSettings(); }, () => renderSettings());
+  const view = new CanvasView($('#stage'), () => { commit(); renderSettings(); }, () => {
+    editHistory.select(state.selectedId);
+    renderSettings();
+  });
+
+  function deleteSelected(): void {
+    const pack = state.pack;
+    if (!pack || !state.selectedId || state.busy) return;
+    const next = pack.items.filter((item) => item.id !== state.selectedId);
+    if (next.length === pack.items.length) return;
+    pack.items = next;
+    state.selectedId = null;
+    commit();
+    renderSettings();
+  }
+
+  function moveHistory(direction: 'undo' | 'redo'): void {
+    if (state.busy) return;
+    if (direction === 'undo') undoEdit(); else redoEdit();
+    renderSettings();
+  }
 
   function renderSettings(): void {
     const pack = state.pack;
@@ -75,10 +96,20 @@ export function mountEditor(root: HTMLElement): () => void {
       : '<li class="info">Sorun yok.</li>';
     $('#busy').textContent = state.busy ?? '';
     for (const b of root.querySelectorAll<HTMLButtonElement>('.actions button')) b.disabled = !!state.busy;
+    $<HTMLButtonElement>('#undo').disabled = !!state.busy || !editHistory.canUndo;
+    $<HTMLButtonElement>('#redo').disabled = !!state.busy || !editHistory.canRedo;
   }
 
   // root (#app) ekranlar arasında kalıcı; dinleyiciler unmount'ta kaldırılmalı
   const ac = new AbortController();
+  root.addEventListener('focusin', (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.dataset.k && (el.type === 'number' || el.type === 'range')) editHistory.beginGroup();
+  }, { signal: ac.signal });
+  root.addEventListener('focusout', (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.dataset.k && (el.type === 'number' || el.type === 'range')) editHistory.endGroup();
+  }, { signal: ac.signal });
   function applySetting(el: HTMLInputElement | HTMLSelectElement, redrawFields: boolean): void {
     const k = el.dataset.k;
     const pack = state.pack;
@@ -115,7 +146,9 @@ export function mountEditor(root: HTMLElement): () => void {
     if (el.dataset.k && (el.type === 'number' || el.type === 'range')) applySetting(el, false);
   }, { signal: ac.signal });
   root.addEventListener('change', (e) => {
-    applySetting(e.target as HTMLInputElement | HTMLSelectElement, true);
+    const el = e.target as HTMLInputElement | HTMLSelectElement;
+    applySetting(el, true);
+    if (el.dataset.k && (el.type === 'number' || el.type === 'range')) editHistory.endGroup();
   }, { signal: ac.signal });
 
   root.addEventListener('click', (e) => {
@@ -123,11 +156,11 @@ export function mountEditor(root: HTMLElement): () => void {
     const pack = state.pack;
     if (!pack) return;
     const warning = t.closest<HTMLElement>('li[data-item]');
-    if (warning) { state.selectedId = warning.dataset.item!; renderSettings(); view.draw(); return; }
+    if (warning) { state.selectedId = warning.dataset.item!; editHistory.select(state.selectedId); renderSettings(); view.draw(); return; }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     const item = pack.items.find((i) => i.id === state.selectedId);
     if (act === 'approve' && item) { item.needsReview = false; commit(); renderSettings(); }
-    if (act === 'delete' && item) { pack.items = pack.items.filter((i) => i !== item); state.selectedId = null; commit(); renderSettings(); }
+    if (act === 'delete' && item) deleteSelected();
     if (act === 'add') { const v = $<HTMLSelectElement>('#addFile').value; if (v) { addStickerItem(v); renderSettings(); } }
     if (act === 'addNew') $<HTMLInputElement>('#addPick').click();
   }, { signal: ac.signal });
@@ -137,7 +170,22 @@ export function mountEditor(root: HTMLElement): () => void {
     const f = input.files?.[0];
     input.value = '';
     if (f) { await addNewPng(f); renderSettings(); }
-  });
+  }, { signal: ac.signal });
+  $('#undo').addEventListener('click', () => moveHistory('undo'), { signal: ac.signal });
+  $('#redo').addEventListener('click', () => moveHistory('redo'), { signal: ac.signal });
+  window.addEventListener('keydown', (e) => {
+    if (!root.isConnected || state.screen !== 'editor' || !state.pack) return;
+    const key = e.key.toLowerCase();
+    if ((e.metaKey || e.ctrlKey) && (key === 'z' || (!e.metaKey && key === 'y'))) {
+      e.preventDefault();
+      moveHistory(e.shiftKey || key === 'y' ? 'redo' : 'undo');
+      return;
+    }
+    if ((e.key === 'Backspace' || e.key === 'Delete') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.target instanceof Element && e.target.closest('input,select,textarea,[contenteditable="true"]')) return;
+      if (state.selectedId && !state.busy) { e.preventDefault(); deleteSelected(); }
+    }
+  }, { signal: ac.signal });
   $('#pdf').addEventListener('click', () => void exportPdf());
   $('#zip').addEventListener('click', () => void exportZip());
   let armed = 0;

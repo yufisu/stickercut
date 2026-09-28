@@ -33,6 +33,19 @@ describe('traceBoundary', () => {
     m.data[4] = 1;
     expect(traceBoundary(m)).toEqual([{ x: 1, y: 1 }]);
   });
+
+  it('girintili bir sınırda başlangıca döndüğünde tekrar tekrar dolaşmaz', () => {
+    const rows = [
+      '............', '............', '....##..##..', '.....###....',
+      '.....##..#..', '...#..####..', '....##.###..', '...####.#...',
+      '....##...#..', '...#..##.#..', '............', '............',
+    ];
+    const m = createMask(12, 12);
+    rows.forEach((row, y) => [...row].forEach((cell, x) => { m.data[y * 12 + x] = cell === '#' ? 1 : 0; }));
+    const points = traceBoundary(m);
+    expect(points.length).toBeLessThan(100);
+    expect(points[0]).toEqual({ x: 4, y: 2 });
+  });
 });
 
 describe('simplifyClosed', () => {
