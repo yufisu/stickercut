@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import {
   initPack, computeCuts, buildPackPdf, renderPackPreview, formatMessage, type LoadedFile, type Message,
 } from '../core/pipeline';
@@ -186,8 +186,9 @@ function cmdImport(args: string[], io: Io): number {
   const packPath = join(dir, 'pack.json');
   if (existsSync(packPath) && !values.force) throw new CliError(`${packPath} zaten var; üzerine yazmak için --force kullan.`);
   for (const [name, bytes] of files) {
-    if (name.split('/').includes('..')) throw new CliError(`Zip’te güvensiz yol var: ${name}`);
+    if (name.includes('\\') || name.split('/').includes('..')) throw new CliError(`Zip’te güvensiz yol var: ${name}`);
     const p = join(dir, ...name.split('/'));
+    if (p !== dir && relative(dir, p).startsWith('..')) throw new CliError(`Zip’te güvensiz yol var: ${name}`);
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, bytes);
   }

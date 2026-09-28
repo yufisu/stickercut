@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
+import { zipSync, strToU8 } from 'fflate';
 import { run, type Io } from '../../src/cli/run';
 import { encodePng } from '../../src/cli/png';
 import { makeScene } from '../helpers/scene';
@@ -77,5 +78,25 @@ describe('cli', () => {
   it('bilinmeyen komut kullanım metni ve 2 döner', async () => {
     expect(await run(['yok'], io)).toBe(2);
     expect(lines.join('\n')).toContain('Kullanım');
+  });
+
+  it('zip içindeki ters slash\'lı yol traversal hedef klasörün dışına çıkamaz', async () => {
+    const outer = mkdtempSync(join(tmpdir(), 'sc-outer-'));
+    const target = join(outer, 'target');
+    mkdirSync(target);
+    const zipPath = join(outer, 'evil.zip');
+    const validPack = JSON.stringify({
+      version: 1,
+      page: { widthMm: 80, heightMm: 140 },
+      designSize: { widthPx: 800, heightPx: 1200 },
+      files: { design: 'd.png', background: 'b.png' },
+      items: [],
+    });
+    writeFileSync(zipPath, zipSync({
+      'pack.json': strToU8(validPack),
+      '..\\..\\evil.txt': strToU8('pwned'),
+    }));
+    expect(await run(['import', zipPath, target], io)).toBe(1);
+    expect(existsSync(join(outer, 'evil.txt'))).toBe(false);
   });
 });
