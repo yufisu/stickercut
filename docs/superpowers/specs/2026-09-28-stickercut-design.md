@@ -95,6 +95,7 @@ Her modül bağımsız test edilebilir.
 {
   "version": 1,
   "page": { "widthMm": 80, "heightMm": 140 },
+  "designSize": { "widthPx": 1600, "heightPx": 2800 },  // tam tasarımın piksel boyutu
   "files": {
     "design": "turk kahvesi.png",          // tam tasarım (yerleştirme referansı)
     "background": "turk kahvesi arka.png"  // 1. sayfanın zemini
@@ -121,6 +122,10 @@ Her modül bağımsız test edilebilir.
   ]
 }
 ```
+
+`scale` her zaman sticker'ın **orijinal** piksel boyutuna göredir. Analizde (eşleştirme, kontur)
+uzun kenarı 2048 px'ten büyük şeffaf sticker'lar hafıza için 2048 px'e küçültülür (iPad'de 14 × 3000 px
+sticker'lı pack'ler çökmesin diye). Bu kural web'de ve CLI'da aynıdır, PDF'e her zaman orijinal PNG gömülür.
 
 Dosya yolları `pack.json`'a göre görecelidir. Konumlar tasarım pikseli cinsindendir.
 Böylece sayfa boyutu değişirse yerleşim bozulmaz.
