@@ -48,9 +48,15 @@ export function squaredDistance(m: Mask): Float64Array {
 export function offsetMask(m: Mask, radius: number): { mask: Mask; pad: number } {
   const pad = Math.ceil(Math.max(0, radius)) + 1;
   const mask = padMask(m, pad);
-  if (radius <= 0) return { mask, pad };
-  const d2 = squaredDistance(mask);
+  if (radius === 0) return { mask, pad };
   const r2 = radius * radius;
-  for (let i = 0; i < d2.length; i++) mask.data[i] = d2[i] <= r2 ? 1 : 0;
+  if (radius > 0) {
+    const d2 = squaredDistance(mask);
+    for (let i = 0; i < d2.length; i++) mask.data[i] = d2[i] <= r2 ? 1 : 0;
+  } else {
+    const background: Mask = { width: mask.width, height: mask.height, data: mask.data.map((v) => v ? 0 : 1) };
+    const d2 = squaredDistance(background);
+    for (let i = 0; i < d2.length; i++) mask.data[i] = mask.data[i] && d2[i] > r2 ? 1 : 0;
+  }
   return { mask, pad };
 }

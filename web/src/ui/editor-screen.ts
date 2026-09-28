@@ -1,5 +1,5 @@
 import { state, subscribe, update } from '../state';
-import { commit, addStickerItem, addNewPng, editHistory, undoEdit, redoEdit, exportPdf, exportZip, newProject, visibleMessages } from '../project-io';
+import { commit, addStickerItem, addNewPng, editHistory, undoEdit, redoEdit, exportPdf, exportZip, newProject, visibleMessages, syncBaseRoles } from '../project-io';
 import { CanvasView } from './canvas-view';
 import { esc } from './html';
 
@@ -51,18 +51,27 @@ export function mountEditor(root: HTMLElement): () => void {
     const item = pack.items.find((i) => i.id === state.selectedId);
     const stickers = [...state.files.values()].filter((f) => f.name !== pack.files.design && f.name !== pack.files.background);
     const opts = (sel?: string) => stickers.map((f) => `<option value="${esc(f.name)}"${f.name === sel ? ' selected' : ''}>${esc(f.name)}</option>`).join('');
+    const baseFiles = [...state.files.values()].filter((f) => f.width === pack.designSize.widthPx && f.height === pack.designSize.heightPx);
+    const baseOpts = (sel: string) => baseFiles.map((f) => `<option value="${esc(f.name)}"${f.name === sel ? ' selected' : ''}>${esc(f.name)}</option>`).join('');
     const wb = item?.overrides.whiteBorder;
     settings.innerHTML = `
       <section><h2>Sayfa</h2><div class="grid2">
         <label>Genişlik (mm)<input data-k="page.widthMm" type="number" step="0.1" min="1" value="${pack.page.widthMm}"></label>
         <label>Yükseklik (mm)<input data-k="page.heightMm" type="number" step="0.1" min="1" value="${pack.page.heightMm}"></label>
       </div></section>
+      <section><h2>Kaynak görseller</h2>
+        <label>Tam tasarım<select data-k="base.design" aria-label="Tam tasarım dosyası">${baseOpts(pack.files.design)}</select></label>
+        <label>Arka plan<select data-k="base.background" aria-label="Arka plan dosyası">${baseOpts(pack.files.background)}</select></label>
+        <p class="lead">Aynı boyuttaki PNG’ler arasından seç. Sticker konumlarını önizlemede kontrol et.</p>
+      </section>
       <section><h2>Genel ayarlar</h2>
         <div class="grid2">
-          <label>Offset (mm)<input data-k="d.offsetMm" type="number" step="0.1" min="0" value="${d.offsetMm}"></label>
+          <label>Kesim ofseti (mm)<input data-k="d.offsetMm" type="number" step="0.05" value="${d.offsetMm}"></label>
           <label>Çizgi (pt)<input data-k="d.strokeWidthPt" type="number" step="0.05" min="0.05" value="${d.strokeWidthPt}"></label>
         </div>
         <label>Yumuşatma<input data-k="d.smoothing" type="range" min="0" max="1" step="0.05" value="${d.smoothing}"></label>
+        <label>Nokta azaltma <output>${d.simplifyMm.toFixed(2)} mm</output><input data-k="d.simplifyMm" aria-label="Genel nokta azaltma" type="range" min="0" max="0.3" step="0.01" value="${d.simplifyMm}"></label>
+        <p class="lead">Değer, kesim çizgisinin izin verilen yaklaşık sapmasıdır; sağa kaydırdıkça nokta azalır.</p>
         <label class="check"><input data-k="d.whiteBorder" type="checkbox"${d.whiteBorder ? ' checked' : ''}> Beyaz kenar</label>
         <label class="check"><input data-k="showCuts" type="checkbox"${state.showCuts ? ' checked' : ''}> Kesim çizgilerini göster</label>
       </section>
@@ -70,9 +79,13 @@ export function mountEditor(root: HTMLElement): () => void {
       <section><h2>Seçili sticker (${esc(item.id)})</h2>
         <label>Dosya<select data-k="i.file">${opts(item.file)}</select></label>
         <div class="grid2">
-          <label>Offset (mm)<input data-k="i.offsetMm" type="number" step="0.1" min="0" placeholder="varsayılan (${d.offsetMm})" value="${item.overrides.offsetMm ?? ''}"></label>
+          <label>Kesim ofseti (mm)<input data-k="i.offsetMm" type="number" step="0.05" placeholder="Genel: ${d.offsetMm}" value="${item.overrides.offsetMm ?? ''}"></label>
           <label>Döndürme (°)<input data-k="i.rotationDeg" type="number" step="1" value="${item.rotationDeg}"></label>
         </div>
+        <p class="lead">Yalnızca bu sticker’ın kesimini içeri almak için örneğin -0.5 yaz. Pozitif değer dışa taşır; boş bırakırsan genel ayar kullanılır.</p>
+        <label>Bu sticker için nokta azaltma <output>${(item.overrides.simplifyMm ?? d.simplifyMm).toFixed(2)} mm</output><input data-k="i.simplifyMm" aria-label="Seçili sticker nokta azaltma" type="range" min="0" max="0.3" step="0.01" value="${item.overrides.simplifyMm ?? d.simplifyMm}"></label>
+        ${item.overrides.simplifyMm !== undefined ? '<button data-act="resetSimplify">Genel ayarı kullan</button>' : ''}
+        <p class="lead" id="cutPoints"></p>
         <label>Beyaz kenar<select data-k="i.whiteBorder">
           <option value=""${wb === undefined ? ' selected' : ''}>Varsayılan</option>
           <option value="1"${wb === true ? ' selected' : ''}>Açık</option>
@@ -87,6 +100,15 @@ export function mountEditor(root: HTMLElement): () => void {
         <button data-act="add">Seçili sticker’ı ekle</button>
         <button data-act="addNew">Yeni PNG yükle ve ekle</button>
       </section>`;
+    renderPointCount();
+  }
+
+  function renderPointCount(): void {
+    const pointLabel = root.querySelector<HTMLElement>('#cutPoints');
+    if (!pointLabel) return;
+    const item = state.pack?.items.find((i) => i.id === state.selectedId);
+    pointLabel.textContent = item?.printOnly ? 'Bu sticker’da kesim çizgisi yok.'
+      : `Kesim noktası: ${state.cuts.get(state.selectedId ?? '')?.length ?? 'hesaplanıyor…'}`;
   }
 
   function renderStatus(): void {
@@ -98,6 +120,7 @@ export function mountEditor(root: HTMLElement): () => void {
     for (const b of root.querySelectorAll<HTMLButtonElement>('.actions button')) b.disabled = !!state.busy;
     $<HTMLButtonElement>('#undo').disabled = !!state.busy || !editHistory.canUndo;
     $<HTMLButtonElement>('#redo').disabled = !!state.busy || !editHistory.canRedo;
+    renderPointCount();
   }
 
   // root (#app) ekranlar arasında kalıcı; dinleyiciler unmount'ta kaldırılmalı
@@ -117,23 +140,45 @@ export function mountEditor(root: HTMLElement): () => void {
     const item = pack.items.find((i) => i.id === state.selectedId);
     const n = Number(el.value);
     switch (k) {
+      case 'base.design':
+      case 'base.background': {
+        const f = state.files.get(el.value);
+        if (!f || f.width !== pack.designSize.widthPx || f.height !== pack.designSize.heightPx) return;
+        const oldDesign = pack.files.design, oldBackground = pack.files.background;
+        if (k === 'base.design') {
+          pack.files.design = f.name;
+          if (f.name === oldBackground) pack.files.background = oldDesign;
+        } else {
+          pack.files.background = f.name;
+          if (f.name === oldDesign) pack.files.design = oldBackground;
+        }
+        syncBaseRoles(pack);
+        state.messages = state.messages.filter((m) => m.code !== 'ROLES');
+        break;
+      }
       case 'page.widthMm': if (n > 0) pack.page.widthMm = n; else return; break;
       case 'page.heightMm': if (n > 0) pack.page.heightMm = n; else return; break;
-      case 'd.offsetMm': if (el.value !== '' && n >= 0) pack.defaults.offsetMm = n; else return; break;
+      case 'd.offsetMm': if (el.value !== '' && Number.isFinite(n)) pack.defaults.offsetMm = n; else return; break;
       case 'd.strokeWidthPt': if (n > 0) pack.defaults.strokeWidthPt = n; else return; break;
       case 'd.smoothing': if (n >= 0 && n <= 1) pack.defaults.smoothing = n; else return; break;
+      case 'd.simplifyMm': if (n >= 0 && n <= 0.3) pack.defaults.simplifyMm = n; else return; break;
       case 'd.whiteBorder': pack.defaults.whiteBorder = (el as HTMLInputElement).checked; break;
       case 'showCuts': update((s) => { s.showCuts = (el as HTMLInputElement).checked; }); return;
       case 'i.file': if (item) item.file = el.value; break;
       case 'i.offsetMm':
-        if (item) { if (el.value === '') delete item.overrides.offsetMm; else item.overrides.offsetMm = Math.max(0, n || 0); }
+        if (item) { if (el.value === '') delete item.overrides.offsetMm; else if (Number.isFinite(n)) item.overrides.offsetMm = n; else return; }
         break;
       case 'i.rotationDeg': if (item && el.value !== '' && Number.isFinite(n)) item.rotationDeg = n; else return; break;
+      case 'i.simplifyMm': if (item && n >= 0 && n <= 0.3) item.overrides.simplifyMm = n; else return; break;
       case 'i.whiteBorder':
         if (item) { if (el.value === '') delete item.overrides.whiteBorder; else item.overrides.whiteBorder = el.value === '1'; }
         break;
       case 'i.printOnly': if (item) item.printOnly = (el as HTMLInputElement).checked; break;
       default: return;
+    }
+    if (k === 'd.simplifyMm' || k === 'i.simplifyMm') {
+      const output = el.parentElement?.querySelector('output');
+      if (output) output.textContent = `${n.toFixed(2)} mm`;
     }
     commit();
     if (redrawFields) renderSettings();
@@ -160,6 +205,7 @@ export function mountEditor(root: HTMLElement): () => void {
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     const item = pack.items.find((i) => i.id === state.selectedId);
     if (act === 'approve' && item) { item.needsReview = false; commit(); renderSettings(); }
+    if (act === 'resetSimplify' && item) { delete item.overrides.simplifyMm; commit(); renderSettings(); }
     if (act === 'delete' && item) deleteSelected();
     if (act === 'add') { const v = $<HTMLSelectElement>('#addFile').value; if (v) { addStickerItem(v); renderSettings(); } }
     if (act === 'addNew') $<HTMLInputElement>('#addPick').click();

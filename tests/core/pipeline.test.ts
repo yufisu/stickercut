@@ -85,6 +85,42 @@ describe('computeCuts', () => {
     expect(Math.abs(r.reduce((a, b) => a + b, 0) / r.length - 110)).toBeLessThan(2);
   });
 
+  it('mm cinsinden sadeleştirme ve öğe override’ı önbellekte ayrı tutulur', () => {
+    const files = sceneFiles();
+    const { pack } = initPack(files, { page: { widthMm: 80 } });
+    const assets = assetsOf(files), cache = new Map();
+    pack!.defaults.simplifyMm = 0;
+    const detailed = computeCuts(pack!, assets, cache).cuts;
+    pack!.defaults.simplifyMm = 0.2;
+    const simple = computeCuts(pack!, assets, cache).cuts;
+    const id = pack!.items[0].id;
+    expect(simple.get(id)!.length).toBeLessThan(detailed.get(id)!.length);
+    pack!.items[0].overrides.simplifyMm = 0;
+    const overridden = computeCuts(pack!, assets, cache).cuts;
+    expect(overridden.get(id)!.length).toBe(detailed.get(id)!.length);
+    expect(overridden.get(pack!.items[1].id)!.length).toBe(simple.get(pack!.items[1].id)!.length);
+  });
+
+  it('seçili sticker için negatif mm ofseti uygular, diğerlerini ve önbelleği korur', () => {
+    const files = sceneFiles();
+    const { pack } = initPack(files, { page: { widthMm: 80 } });
+    const assets = assetsOf(files), cache = new Map();
+    const baseline = computeCuts(pack!, assets, cache).cuts;
+    const item = pack!.items.find((i) => i.file === 'cay.png' && i.scale > 0.45)!;
+    item.overrides.offsetMm = -0.5;
+    const inset = computeCuts(pack!, assets, cache).cuts;
+    const bounds = (pts: { x: number; y: number }[]) => ({
+      width: Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)),
+      height: Math.max(...pts.map((p) => p.y)) - Math.min(...pts.map((p) => p.y)),
+    });
+    const before = bounds(baseline.get(item.id)!);
+    const after = bounds(inset.get(item.id)!);
+    expect(before.width - after.width).toBeCloseTo(10, 0); // iki tarafta 0,5 mm; 0,1 mm/tasarım px
+    expect(before.height - after.height).toBeCloseTo(10, 0);
+    const other = pack!.items.find((i) => i.id !== item.id)!;
+    expect(inset.get(other.id)).toEqual(baseline.get(other.id));
+  });
+
   it('printOnly öğeleri kesmez; eksik dosyayı bildirir, opak PNG’yi keser', () => {
     const files = sceneFiles();
     const { pack } = initPack(files, { page: { widthMm: 80 } });

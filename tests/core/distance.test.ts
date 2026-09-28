@@ -35,4 +35,13 @@ describe('distance', () => {
     const { mask } = offsetMask(m, 0);
     expect(maskArea(mask)).toBe(maskArea(m));
   });
+
+  it('negatif offset Öklid mesafesiyle içeri alır', () => {
+    const m = disc(80, 25);
+    const { mask, pad } = offsetMask(m, -5);
+    expect(pad).toBe(1);
+    const expected = Math.PI * 20 * 20;
+    expect(Math.abs(maskArea(mask) - expected) / expected).toBeLessThan(0.05);
+    expect(maskArea(mask)).toBeLessThan(maskArea(m));
+  });
 });

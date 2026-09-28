@@ -10,8 +10,17 @@ import { EditHistory } from './history';
 const DISPLAY_MAX = 1600;
 export const editHistory = new EditHistory();
 
+export function syncBaseRoles(pack: Pack): void {
+  for (const f of state.files.values()) {
+    if (f.name === pack.files.design) f.role = 'design';
+    else if (f.name === pack.files.background) f.role = 'background';
+    else if (f.role === 'design' || f.role === 'background') f.role = pack.items.some((i) => i.file === f.name) ? 'sticker' : 'ignore';
+  }
+}
+
 function restoreEdit(snapshot: { pack: Pack; selectedId: string | null } | null): void {
   if (!snapshot) return;
+  syncBaseRoles(snapshot.pack);
   update((s) => {
     s.pack = snapshot.pack;
     s.selectedId = snapshot.selectedId;
@@ -27,6 +36,7 @@ export function redoEdit(): void { restoreEdit(editHistory.redo()); }
 
 function reviewMessages(pack: Pack, messages: Message[]): Message[] {
   const kept = messages.filter((m) => {
+    if (m.code === 'ROLES') return false; // Pack'te iki kaynak zaten seçilmiş; eski aday uyarısı geçersiz.
     if (m.code === 'NEEDS_REVIEW') return pack.items.some((i) => i.id === m.itemId && i.needsReview);
     if (m.code === 'UNUSED_STICKER') return !pack.items.some((i) => i.file === m.file);
     return true;

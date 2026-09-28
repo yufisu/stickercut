@@ -1,4 +1,4 @@
-import { type Mask, type Raster, alphaMask, downscaleMask, largestComponent, fillHoles, padMask } from './raster';
+import { type Mask, type Raster, alphaMask, downscaleMask, largestComponent, fillHoles } from './raster';
 import { offsetMask } from './distance';
 import type { Pt } from './geometry';
 
@@ -8,11 +8,13 @@ export interface CutShapeOptions {
   offsetPx: number;
   /** 0 = ham, 1 = çok yumuşak */
   smoothing: number;
+  /** Kaynak raster pikseli cinsinden en büyük sadeleştirme sapması. */
+  simplifyPx: number;
   maxWorkSize?: number;
 }
 export interface CutShape { points: Pt[]; extraPartsRatio: number }
 
-export type StickerErrorCode = 'NO_ALPHA' | 'EMPTY';
+export type StickerErrorCode = 'NO_ALPHA' | 'EMPTY' | 'OFFSET_EMPTY';
 export class StickerError extends Error {
   constructor(public code: StickerErrorCode, message: string) {
     super(message);
@@ -91,10 +93,11 @@ function douglasPeucker(pts: Pt[], eps: number): Pt[] {
   while (stack.length) {
     const [a, b] = stack.pop()!;
     const A = pts[a], B = pts[b];
-    const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1;
+    const dx = B.x - A.x, dy = B.y - A.y, len2 = dx * dx + dy * dy;
     let far = -1, fd = eps;
     for (let i = a + 1; i < b; i++) {
-      const d = Math.abs(dy * (pts[i].x - A.x) - dx * (pts[i].y - A.y)) / len;
+      const t = len2 ? Math.max(0, Math.min(1, ((pts[i].x - A.x) * dx + (pts[i].y - A.y) * dy) / len2)) : 0;
+      const d = Math.hypot(pts[i].x - A.x - t * dx, pts[i].y - A.y - t * dy);
       if (d > fd) { fd = d; far = i; }
     }
     if (far >= 0) {
@@ -120,8 +123,11 @@ export function simplifyClosed(pts: Pt[], eps: number): Pt[] {
 export function stickerCutShape(r: Raster, o: CutShapeOptions): CutShape {
   if (isFullyOpaque(r)) {
     // Tam dolu görselde alfa sınırı yoktur; PNG'nin dış kenarı kesim sınırıdır.
-    // Offset, bu dikdörtgenin dört kenarını aynı miktarda dışarı taşırır.
-    const offset = Math.max(0, o.offsetPx);
+    // Opak PNG'de kesim yolu görüntü dikdörtgenidir; işaretli ofset dört kenarı taşır.
+    const offset = o.offsetPx;
+    if (r.width + 2 * offset <= 0 || r.height + 2 * offset <= 0) {
+      throw new StickerError('OFFSET_EMPTY', 'İçe ofset sticker boyutundan büyük; kesim çizgisi oluşturulamadı.');
+    }
     const start = offset === 0 ? 0 : -offset;
     return { points: [
       { x: start, y: start },
@@ -137,12 +143,20 @@ export function stickerCutShape(r: Raster, o: CutShapeOptions): CutShape {
   if (area === 0) throw new StickerError('EMPTY', 'Bu PNG tamamen şeffaf, kesilecek bir şekil yok.');
   const filled = fillHoles(main);
   const radius = o.offsetPx / sx;
-  const { mask, pad } = radius > 0 ? offsetMask(filled, radius) : { mask: padMask(filled, 1), pad: 1 };
+  const { mask, pad } = offsetMask(filled, radius);
+  const insetShape = largestComponent(mask);
+  if (insetShape.area === 0) {
+    throw new StickerError('OFFSET_EMPTY', 'İçe ofset sticker şeklini tamamen siliyor; değeri azaltın.');
+  }
   const window = 1 + 2 * Math.round(Math.max(0, Math.min(1, o.smoothing)) * 6);
-  const simplified = simplifyClosed(smoothClosed(traceBoundary(mask), window), 0.5);
-  const maxOther = otherAreas.reduce((m, a) => Math.max(m, a), 0);
+  const tolerance = Math.max(0.5, Math.max(0, o.simplifyPx) / Math.max(sx, sy));
+  const simplified = simplifyClosed(smoothClosed(traceBoundary(insetShape.mask), window), tolerance);
+  const maxOther = Math.max(
+    otherAreas.reduce((m, a) => Math.max(m, a), 0),
+    insetShape.otherAreas.reduce((m, a) => Math.max(m, a), 0),
+  );
   return {
     points: simplified.map((p) => ({ x: (p.x - pad + 0.5) * sx, y: (p.y - pad + 0.5) * sy })),
-    extraPartsRatio: maxOther / area,
+    extraPartsRatio: Math.max(maxOther / area, maxOther / insetShape.area),
   };
 }

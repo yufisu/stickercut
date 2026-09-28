@@ -13,6 +13,10 @@ export function mountFiles(root: HTMLElement): () => void {
         <input type="file" id="picker" multiple accept=".png,.PNG,image/png,.zip,application/zip" hidden />
         <span>Dosya seç ya da buraya sürükle</span>
       </label>
+      <section class="page">
+        <label>Tam tasarım<select id="designPick" aria-label="Tam tasarım dosyası"></select></label>
+        <label>Arka plan<select id="backgroundPick" aria-label="Arka plan dosyası"></select></label>
+      </section>
       <section id="list" class="list"></section>
       <section class="page">
         <label>Sayfa genişliği (mm)<input id="pw" type="number" step="0.1" min="1" /></label>
@@ -27,6 +31,31 @@ export function mountFiles(root: HTMLElement): () => void {
   const pw = $<HTMLInputElement>('#pw'), ph = $<HTMLInputElement>('#ph');
   pw.value = String(state.page.widthMm);
   ph.value = state.page.heightMm ? String(state.page.heightMm) : '';
+
+  const rolesResolved = () => {
+    const files = [...state.files.values()];
+    const design = files.find((f) => f.role === 'design');
+    const background = files.find((f) => f.role === 'background');
+    if (design && background && design.name !== background.name && design.width === background.width && design.height === background.height) {
+      state.messages = state.messages.filter((m) => m.code !== 'ROLES');
+    }
+  };
+
+  for (const [id, role] of [['designPick', 'design'], ['backgroundPick', 'background']] as const) {
+    $<HTMLSelectElement>(`#${id}`).addEventListener('change', (e) => {
+      const name = (e.target as HTMLSelectElement).value;
+      const selected = state.files.get(name);
+      if (!selected) return;
+      update((s) => {
+        const former = [...s.files.values()].find((f) => f.role === role);
+        const opposite = role === 'design' ? 'background' : 'design';
+        if (former) former.role = selected.role === opposite ? opposite : 'ignore';
+        selected.role = role;
+        rolesResolved();
+      });
+      scheduleAutosave();
+    });
+  }
 
   picker.addEventListener('change', () => { if (picker.files?.length) void addFiles([...picker.files]); picker.value = ''; });
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
@@ -46,6 +75,7 @@ export function mountFiles(root: HTMLElement): () => void {
     update((s) => {
       if (role === 'design' || role === 'background') for (const o of s.files.values()) if (o.role === role) o.role = 'ignore';
       f.role = role;
+      rolesResolved();
     });
     scheduleAutosave();
   });
@@ -57,6 +87,12 @@ export function mountFiles(root: HTMLElement): () => void {
     // detached and must not be touched.
     if (!list.isConnected) return;
     const files = [...state.files.values()];
+    const choices = `<option value="">Seç</option>${files.map((f) => `<option value="${esc(f.name)}">${esc(f.name)} (${f.width}×${f.height})</option>`).join('')}`;
+    for (const [id, role] of [['designPick', 'design'], ['backgroundPick', 'background']] as const) {
+      const select = $<HTMLSelectElement>(`#${id}`);
+      select.innerHTML = choices;
+      select.value = files.find((f) => f.role === role)?.name ?? '';
+    }
     list.innerHTML = files.map((f) => `
       <div class="row">
         <canvas width="112" height="112" data-thumb="${esc(f.name)}"></canvas>
@@ -73,7 +109,8 @@ export function mountFiles(root: HTMLElement): () => void {
     }
     $('#msgs').innerHTML = state.messages.map((m) => `<li class="${m.level}">${esc(m.text)}</li>`).join('');
     $('#busy').textContent = state.busy ?? '';
-    $<HTMLButtonElement>('#place').disabled = !!state.busy || !files.some((f) => f.role === 'design') || !files.some((f) => f.role === 'background');
+    const design = files.find((f) => f.role === 'design'), background = files.find((f) => f.role === 'background');
+    $<HTMLButtonElement>('#place').disabled = !!state.busy || !design || !background || design.width !== background.width || design.height !== background.height;
   };
   render();
   return subscribe(render);

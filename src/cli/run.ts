@@ -52,6 +52,12 @@ function num(v: string, flag: string): number {
   return n;
 }
 
+function signedNum(v: string, flag: string): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) throw new UsageError(`${flag} bir sayı olmalı, verilen: ${v}`);
+  return n;
+}
+
 function readPack(path: string): Pack {
   if (!existsSync(path)) throw new CliError(`pack.json bulunamadı: ${path}`);
   return parsePack(readFileSync(path, 'utf8'));
@@ -119,7 +125,7 @@ async function cmdBuild(args: string[], io: Io): Promise<number> {
   if (positionals.length !== 1) throw new UsageError('build tek bir pack.json bekler.');
   const packPath = resolve(positionals[0]);
   const pack = readPack(packPath);
-  if (values.offset !== undefined) pack.defaults.offsetMm = num(values.offset, '--offset');
+  if (values.offset !== undefined) pack.defaults.offsetMm = signedNum(values.offset, '--offset');
   if (values['white-border'] !== undefined) pack.defaults.whiteBorder = values['white-border'];
   if (values.stroke !== undefined) pack.defaults.strokeWidthPt = num(values.stroke, '--stroke');
   const { pdf, messages } = await buildPackPdf(pack, loadPackFiles(packPath, packFiles(pack, false)));

@@ -15,7 +15,7 @@ const inCircle = (x: number, y: number, cx: number, cy: number, r: number) =>
 const radii = (pts: { x: number; y: number }[], cx: number, cy: number) =>
   pts.map((p) => Math.hypot(p.x - cx, p.y - cy));
 const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
-const opts = { alphaThreshold: 128, offsetPx: 0, smoothing: 0.5 };
+const opts = { alphaThreshold: 128, offsetPx: 0, smoothing: 0.5, simplifyPx: 0 };
 
 describe('traceBoundary', () => {
   it('3x3 karenin 8 kenar pikselini sırayla verir', () => {
@@ -60,6 +60,25 @@ describe('simplifyClosed', () => {
 });
 
 describe('stickerCutShape', () => {
+  it('küçük kenar dalgalanmalarını az noktayla izlerken belirtilen sapma sınırını korur', () => {
+    const r = raster(300, (x, y) => {
+      const wave = Math.round(2 * Math.sin(y / 3));
+      return y >= 35 && y <= 265 && x >= 35 + wave && x <= 265 + wave ? 255 : 0;
+    });
+    const detailed = stickerCutShape(r, { ...opts, simplifyPx: 0 }).points;
+    const simplified = stickerCutShape(r, { ...opts, simplifyPx: 3 }).points;
+    const distanceToSegment = (p: typeof detailed[number], a: typeof detailed[number], b: typeof detailed[number]) => {
+      const dx = b.x - a.x, dy = b.y - a.y, length2 = dx * dx + dy * dy;
+      const t = length2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length2)) : 0;
+      return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+    };
+    expect(detailed.length).toBeGreaterThan(50);
+    expect(simplified).toHaveLength(4);
+    for (const point of detailed) {
+      expect(Math.min(...simplified.map((p, i) => distanceToSegment(point, p, simplified[(i + 1) % simplified.length])))).toBeLessThanOrEqual(3);
+    }
+  });
+
   it('dairenin konturu yarıçapı korur', () => {
     const r = raster(400, (x, y) => (inCircle(x, y, 200, 200, 100) ? 255 : 0));
     const { points, extraPartsRatio } = stickerCutShape(r, opts);
@@ -71,6 +90,13 @@ describe('stickerCutShape', () => {
     const r = raster(400, (x, y) => (inCircle(x, y, 200, 200, 100) ? 255 : 0));
     const { points } = stickerCutShape(r, { ...opts, offsetPx: 20 });
     expect(Math.abs(mean(radii(points, 200, 200)) - 120)).toBeLessThan(1.5);
+  });
+
+  it('negatif offset kesim yolunu içeri taşır ve aşırı değeri reddeder', () => {
+    const r = raster(400, (x, y) => (inCircle(x, y, 200, 200, 100) ? 255 : 0));
+    const { points } = stickerCutShape(r, { ...opts, offsetPx: -20 });
+    expect(Math.abs(mean(radii(points, 200, 200)) - 80)).toBeLessThan(1.5);
+    expect(() => stickerCutShape(r, { ...opts, offsetPx: -150 })).toThrow('İçe ofset');
   });
 
   it('kaçak lekeyi atar, iç boşluğu doldurur', () => {
@@ -100,6 +126,10 @@ describe('stickerCutShape', () => {
     expect(stickerCutShape(raster(50, () => 255), { ...opts, offsetPx: 5 }).points).toEqual([
       { x: -5, y: -5 }, { x: 55, y: -5 }, { x: 55, y: 55 }, { x: -5, y: 55 },
     ]);
+    expect(stickerCutShape(raster(50, () => 255), { ...opts, offsetPx: -5 }).points).toEqual([
+      { x: 5, y: 5 }, { x: 45, y: 5 }, { x: 45, y: 45 }, { x: 5, y: 45 },
+    ]);
+    expect(() => stickerCutShape(raster(50, () => 255), { ...opts, offsetPx: -25 })).toThrow('İçe ofset');
   });
 
   it('tamamen şeffaf PNG için EMPTY hatası', () => {

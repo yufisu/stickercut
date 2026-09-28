@@ -40,6 +40,8 @@ describe('cli', () => {
     const doc = await PDFDocument.load(readFileSync(join(dir, 'pack.pdf')));
     expect(doc.getPageCount()).toBe(2);
     expect(JSON.parse(readFileSync(join(dir, 'pack.json'), 'utf8')).defaults.offsetMm).toBe(0); // bayrak kalıcı değil
+    expect(await run(['build', join(dir, 'pack.json'), '--offset=-0.5', '-o', join(dir, 'inset.pdf')], io)).toBe(0);
+    expect(existsSync(join(dir, 'inset.pdf'))).toBe(true);
   });
 
   it('preview komutu önizleme yazar', async () => {

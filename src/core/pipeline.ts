@@ -107,7 +107,7 @@ export function computeCuts(pack: Pack, assets: Map<string, Asset>, cache: CutCa
   const cuts = new Map<string, Pt[]>();
   const messages: Message[] = [];
   const warned = new Set<string>();
-  const mm = mmPerDesignPx(pack).x;
+  const mm = mmPerDesignPx(pack);
   for (const item of pack.items) {
     if (item.printOnly) continue;
     const a = assets.get(item.file);
@@ -117,12 +117,17 @@ export function computeCuts(pack: Pack, assets: Map<string, Asset>, cache: CutCa
     }
     const s = effectiveSettings(pack, item);
     const rasterPerOrig = a.raster.width / a.width;
-    const offsetRasterPx = round((s.offsetMm / (mm * item.scale)) * rasterPerOrig, 1);
-    const key = `${item.file}|${offsetRasterPx}|${s.smoothing}|${s.alphaThreshold}`;
+    const offsetRasterPx = round((s.offsetMm / (mm.x * item.scale)) * rasterPerOrig, 1);
+    const simplifyMm = Number.isFinite(s.simplifyMm) ? Math.max(0, s.simplifyMm) : DEFAULT_SETTINGS.simplifyMm;
+    const simplifyRasterPx = simplifyMm / (Math.max(mm.x, mm.y) * item.scale) * rasterPerOrig;
+    const key = `${item.file}|${offsetRasterPx}|${s.smoothing}|${s.alphaThreshold}|${round(simplifyRasterPx, 3)}`;
     let shape = cache.get(key);
     if (!shape) {
       try {
-        shape = stickerCutShape(a.raster, { alphaThreshold: s.alphaThreshold, offsetPx: offsetRasterPx, smoothing: s.smoothing });
+        shape = stickerCutShape(a.raster, {
+          alphaThreshold: s.alphaThreshold, offsetPx: offsetRasterPx,
+          smoothing: s.smoothing, simplifyPx: simplifyRasterPx,
+        });
       } catch (e) {
         if (!(e instanceof StickerError)) throw e;
         messages.push({ level: 'error', code: e.code, itemId: item.id, file: item.file, text: `"${item.file}": ${e.message}` });

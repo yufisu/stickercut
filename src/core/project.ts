@@ -3,6 +3,8 @@ export interface Settings {
   whiteBorder: boolean;
   strokeWidthPt: number;
   smoothing: number;
+  /** Kesim yolunun izin verilen en büyük sadeleştirme sapması (mm). */
+  simplifyMm: number;
   alphaThreshold: number;
 }
 
@@ -11,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   whiteBorder: false,
   strokeWidthPt: 1,
   smoothing: 0.5,
+  simplifyMm: 0.06,
   alphaThreshold: 128,
 };
 
