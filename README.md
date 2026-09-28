@@ -2,6 +2,8 @@
 
 Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden düzenlenebilir vektör kesim çizgileri olan iki sayfalı PDF üretir. İlk sayfa baskı, ikinci sayfa kesim içindir.
 
+**Canlı uygulama:** https://yufisu.github.io/stickercut/
+
 ## Web
 
 `npm ci && npm run dev` ile yerel arayüzü aç. iPad Safari ve Mac tarayıcısında PNG'leri seç, rolleri denetle, **Yerleştir**'e dokun; ardından sticker'ları taşı, ölçekle veya döndür. PDF ve proje ZIP'i arayüzden dışa aktar. İşleme tarayıcıda yapılır; dosyalar sunucuya yüklenmez. Proje aynı tarayıcıda otomatik kaydedilir.
@@ -19,3 +21,7 @@ node bin/stickercut.mjs build "<pack klasörü>/pack.json"
 Klasörde başka PNG'ler de varsa `init` için `--design`, `--background` ve `-o` kullan. Ayrıntılı agent akışı [AGENTS.md](AGENTS.md) içinde; tasarım kararları [spec](docs/superpowers/specs/2026-09-28-stickercut-design.md) içinde.
 
 Gerçek kahve örneğinde üç baklava için ayrı kaynak PNG yok. Bu üç otomatik eşleşme inceleme gerektirir; doğru kaynak eklenmeden baskıya hazır kabul edilmemelidir.
+
+## Yayınlama
+
+Kaynak kod `main`, yayımlanan statik dosyalar `gh-pages` dalındadır. Yeni sürüm için `npm run publish:pages` çalıştır: önce tür denetimi, testler ve web build'i koşar; sonra yalnızca `dist/` çıktısını Pages dalına gönderir. GitHub Pages, bu dalın kökünden otomatik yayın yapar.
