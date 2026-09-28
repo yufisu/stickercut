@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+# Gerçek çizimler asla repo'ya girmez
+*.png
+*.PNG
+*.pdf
+*.zip
+!web/public/**/*.png
