@@ -4,8 +4,28 @@ import * as storage from './storage';
 import { shareOrDownload } from './share';
 import { parsePack, serializePack, nextItemId, nfc, type Pack } from '../../src/core/project';
 import { zipToPack } from '../../src/core/zip';
+import type { Message } from '../../src/core/pipeline';
 
 const DISPLAY_MAX = 1600;
+
+function reviewMessages(pack: Pack, messages: Message[]): Message[] {
+  const kept = messages.filter((m) => {
+    if (m.code === 'NEEDS_REVIEW') return pack.items.some((i) => i.id === m.itemId && i.needsReview);
+    if (m.code === 'UNUSED_STICKER') return !pack.items.some((i) => i.file === m.file);
+    return true;
+  });
+  for (const item of pack.items) {
+    if (item.needsReview && !kept.some((m) => m.code === 'NEEDS_REVIEW' && m.itemId === item.id)) {
+      kept.push({ level: 'warning', code: 'NEEDS_REVIEW', itemId: item.id, file: item.file,
+        text: `"${item.file}" (${item.id}) eşleşmesi zayıf (skor ${item.matchScore}); yerini kontrol et.` });
+    }
+  }
+  return kept;
+}
+
+export function visibleMessages(): Message[] {
+  return state.pack ? reviewMessages(state.pack, state.messages) : state.messages;
+}
 
 async function makeBitmap(bytes: Uint8Array): Promise<ImageBitmap> {
   const blob = new Blob([bytes as BlobPart], { type: 'image/png' });
@@ -35,13 +55,18 @@ async function registerFiles(entries: { name: string; bytes: Uint8Array; role?: 
 }
 
 let saveTimer = 0;
+let saveQueue = Promise.resolve();
 export function scheduleAutosave(): void {
   clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => void storage.save({
-    packJson: state.pack ? serializePack(state.pack) : null,
-    files: [...state.files.values()].map(({ name, bytes, role }) => ({ name, bytes, role })),
-    page: state.page,
-  }), 500);
+  saveTimer = window.setTimeout(() => {
+    const snapshot: storage.Saved = {
+      packJson: state.pack ? serializePack(state.pack) : null,
+      files: [...state.files.values()].map(({ name, bytes, role }) => ({ name, bytes, role })),
+      page: { ...state.page },
+      messages: state.pack ? reviewMessages(state.pack, state.messages) : [...state.messages],
+    };
+    saveQueue = saveQueue.then(() => storage.save(snapshot));
+  }, 500);
 }
 
 export async function addFiles(list: File[]): Promise<void> {
@@ -127,7 +152,7 @@ async function importZip(bytes: Uint8Array): Promise<void> {
   state.files.clear();
   const roleOf = (n: string): Role => (n === pack.files.design ? 'design' : n === pack.files.background ? 'background' : 'sticker');
   await registerFiles([...files].map(([name, b]) => ({ name, bytes: b, role: roleOf(nfc(name)) })));
-  update((s) => { s.pack = pack; s.screen = 'editor'; s.selectedId = null; s.messages = []; });
+  update((s) => { s.pack = pack; s.screen = 'editor'; s.selectedId = null; s.messages = reviewMessages(pack, []); });
   await recomputeCuts();
   scheduleAutosave();
 }
@@ -152,6 +177,8 @@ export async function exportZip(): Promise<void> {
 
 export async function newProject(): Promise<void> {
   await engine.reset();
+  clearTimeout(saveTimer);
+  await saveQueue;
   await storage.clear();
   for (const f of state.files.values()) f.bitmap.close();
   update((s) => {
@@ -166,7 +193,8 @@ export async function restore(): Promise<void> {
   await busy('Kaldığın yerden açılıyor…', async () => {
     await registerFiles(saved.files);
     const pack = saved.packJson ? parsePack(saved.packJson) : null;
-    update((s) => { s.page = saved.page; s.pack = pack; s.screen = pack ? 'editor' : 'files'; });
+    update((s) => { s.page = saved.page; s.pack = pack; s.screen = pack ? 'editor' : 'files';
+      s.messages = pack ? reviewMessages(pack, saved.messages ?? []) : saved.messages ?? []; });
     if (pack) await recomputeCuts();
   });
 }

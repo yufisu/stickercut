@@ -1,10 +1,12 @@
 import { get, set, del } from 'idb-keyval';
 import type { Role } from './state';
+import type { Message } from '../../src/core/pipeline';
 
 export interface Saved {
   packJson: string | null;
   files: { name: string; bytes: Uint8Array; role: Role }[];
   page: { widthMm: number; heightMm: number | null };
+  messages?: Message[];
 }
 const KEY = 'stickercut:project';
 
