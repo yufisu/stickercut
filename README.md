@@ -8,6 +8,8 @@ Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden düz
 
 `npm ci && npm run dev` ile yerel arayüzü aç. iPad Safari ve Mac tarayıcısında PNG'leri seç, rolleri denetle, **Yerleştir**'e dokun; ardından sticker'ları taşı, ölçekle veya döndür. PDF ve proje ZIP'i arayüzden dışa aktar. İşleme tarayıcıda yapılır; dosyalar sunucuya yüklenmez. Proje aynı tarayıcıda otomatik kaydedilir.
 
+Dosya seçimi ekranında yanlış yüklediğin PNG'yi **Kaldır** ile listeden çıkarabilir, **Baştan başla** ile tüm dosyaları ve otomatik kaydı temizleyebilirsin. Yeni dosyaları aynı alandan ekleyebilirsin; editöre geçmen gerekmez.
+
 Sticker seçiliyken **Kesim ofseti (mm)** alanına `-0.5` girerek yalnızca o sticker'ın kesim çizgisini yarım milimetre içeri alabilirsin. Pozitif değer çizgiyi dışarı taşır; alanı boşaltmak genel ayara döner. **Nokta azaltma** kaydırıcısı çizgideki gereksiz noktaları azaltır ve seçili sticker'ın nokta sayısı anlık gösterilir. Birden fazla tam tasarım/arka plan adayı varsa dosya yükleme ekranındaki seçim alanlarını veya editördeki **Kaynak görseller** bölümünü kullan.
 
 ## CLI

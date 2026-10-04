@@ -1,5 +1,5 @@
 import { state, subscribe, update, type Role } from '../state';
-import { addFiles, place, scheduleAutosave } from '../project-io';
+import { addFiles, removeFile, newProject, place, scheduleAutosave } from '../project-io';
 import { esc } from './html';
 
 const ROLE_LABELS: [Role, string][] = [['design', 'Tam tasarım'], ['background', 'Arka plan'], ['sticker', 'Sticker'], ['ignore', 'Yok say']];
@@ -7,12 +7,17 @@ const ROLE_LABELS: [Role, string][] = [['design', 'Tam tasarım'], ['background'
 export function mountFiles(root: HTMLElement): () => void {
   root.innerHTML = `
     <main class="files">
-      <h1>stickercut</h1>
+      <header class="files-header">
+        <h1>stickercut</h1>
+        <button id="restart" type="button" class="danger">Baştan başla</button>
+      </header>
       <p class="lead">Tam tasarım, arka plan ve sticker PNG’lerini seç. Daha önce dışa aktardığın bir proje .zip’ini de açabilirsin.</p>
-      <label class="drop" id="drop">
+      <div class="drop" id="drop">
         <input type="file" id="picker" multiple accept=".png,.PNG,image/png,.zip,application/zip" hidden />
-        <span>Dosya seç ya da buraya sürükle</span>
-      </label>
+        <button id="browse" type="button">Dosya seç</button>
+        <span>ya da buraya sürükle</span>
+      </div>
+      <p id="fileSummary" class="file-summary" aria-live="polite"></p>
       <section class="page">
         <label>Tam tasarım<select id="designPick" aria-label="Tam tasarım dosyası"></select></label>
         <label>Arka plan<select id="backgroundPick" aria-label="Arka plan dosyası"></select></label>
@@ -24,7 +29,7 @@ export function mountFiles(root: HTMLElement): () => void {
       </section>
       <ul id="msgs" class="msgs"></ul>
       <button id="place" class="primary">Yerleştir</button>
-      <p id="busy" class="busy"></p>
+      <p id="busy" class="busy" role="status"></p>
     </main>`;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
   const drop = $('#drop'), picker = $<HTMLInputElement>('#picker'), list = $('#list');
@@ -45,9 +50,14 @@ export function mountFiles(root: HTMLElement): () => void {
     $<HTMLSelectElement>(`#${id}`).addEventListener('change', (e) => {
       const name = (e.target as HTMLSelectElement).value;
       const selected = state.files.get(name);
-      if (!selected) return;
+      if (state.busy) return;
       update((s) => {
         const former = [...s.files.values()].find((f) => f.role === role);
+        if (!selected) {
+          if (former) former.role = 'ignore';
+          rolesResolved();
+          return;
+        }
         const opposite = role === 'design' ? 'background' : 'design';
         if (former) former.role = selected.role === opposite ? opposite : 'ignore';
         selected.role = role;
@@ -57,20 +67,21 @@ export function mountFiles(root: HTMLElement): () => void {
     });
   }
 
+  $('#browse').addEventListener('click', () => picker.click());
   picker.addEventListener('change', () => { if (picker.files?.length) void addFiles([...picker.files]); picker.value = ''; });
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', (e) => {
     e.preventDefault();
     drop.classList.remove('over');
-    if (e.dataTransfer?.files.length) void addFiles([...e.dataTransfer.files]);
+    if (!state.busy && e.dataTransfer?.files.length) void addFiles([...e.dataTransfer.files]);
   });
   pw.addEventListener('change', () => { if (Number(pw.value) > 0) { state.page.widthMm = Number(pw.value); scheduleAutosave(); } });
   ph.addEventListener('change', () => { state.page.heightMm = Number(ph.value) > 0 ? Number(ph.value) : null; scheduleAutosave(); });
   list.addEventListener('change', (e) => {
     const sel = e.target as HTMLSelectElement;
     const f = state.files.get(sel.dataset.name ?? '');
-    if (!f) return;
+    if (!f || state.busy) return;
     const role = sel.value as Role;
     update((s) => {
       if (role === 'design' || role === 'background') for (const o of s.files.values()) if (o.role === role) o.role = 'ignore';
@@ -79,6 +90,11 @@ export function mountFiles(root: HTMLElement): () => void {
     });
     scheduleAutosave();
   });
+  list.addEventListener('click', (e) => {
+    const button = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-remove]');
+    if (button) void removeFile(button.dataset.remove!);
+  });
+  $('#restart').addEventListener('click', () => void newProject());
   $('#place').addEventListener('click', () => void place());
 
   const render = () => {
@@ -87,6 +103,10 @@ export function mountFiles(root: HTMLElement): () => void {
     // detached and must not be touched.
     if (!list.isConnected) return;
     const files = [...state.files.values()];
+    pw.value = String(state.page.widthMm);
+    ph.value = state.page.heightMm ? String(state.page.heightMm) : '';
+    $('#fileSummary').textContent = files.length ? `${files.length} dosya seçildi. Yanlış dosyaları kaldırabilir veya baştan başlayabilirsin.` : '';
+    $('#browse').textContent = files.length ? 'Dosya ekle' : 'Dosya seç';
     const choices = `<option value="">Seç</option>${files.map((f) => `<option value="${esc(f.name)}">${esc(f.name)} (${f.width}×${f.height})</option>`).join('')}`;
     for (const [id, role] of [['designPick', 'design'], ['backgroundPick', 'background']] as const) {
       const select = $<HTMLSelectElement>(`#${id}`);
@@ -98,7 +118,8 @@ export function mountFiles(root: HTMLElement): () => void {
         <canvas width="112" height="112" data-thumb="${esc(f.name)}"></canvas>
         <span class="name">${esc(f.name)}</span>
         <span class="dim">${f.width}×${f.height}</span>
-        <select data-name="${esc(f.name)}">${ROLE_LABELS.map(([r, l]) => `<option value="${r}"${r === f.role ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <select data-name="${esc(f.name)}" aria-label="${esc(f.name)} dosyasının rolü">${ROLE_LABELS.map(([r, l]) => `<option value="${r}"${r === f.role ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <button type="button" class="danger" data-remove="${esc(f.name)}" aria-label="${esc(f.name)} dosyasını kaldır">Kaldır</button>
       </div>`).join('');
     for (const c of list.querySelectorAll<HTMLCanvasElement>('canvas[data-thumb]')) {
       const f = state.files.get(c.dataset.thumb!);
@@ -109,6 +130,11 @@ export function mountFiles(root: HTMLElement): () => void {
     }
     $('#msgs').innerHTML = state.messages.map((m) => `<li class="${m.level}">${esc(m.text)}</li>`).join('');
     $('#busy').textContent = state.busy ?? '';
+    for (const control of root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('input, select, button')) {
+      control.disabled = !!state.busy;
+    }
+    drop.setAttribute('aria-disabled', String(!!state.busy));
+    $<HTMLButtonElement>('#restart').disabled = !!state.busy || !files.length;
     const design = files.find((f) => f.role === 'design'), background = files.find((f) => f.role === 'background');
     $<HTMLButtonElement>('#place').disabled = !!state.busy || !design || !background || design.width !== background.width || design.height !== background.height;
   };

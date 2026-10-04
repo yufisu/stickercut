@@ -26,6 +26,7 @@ function call<T>(req: Request): Promise<T> {
 export const engine = {
   addFiles: (files: { name: string; bytes: Uint8Array }[]) =>
     call<{ name: string; width: number; height: number }[]>({ type: 'addFiles', files }),
+  removeFiles: (names: string[]) => call<null>({ type: 'removeFiles', names }),
   roles: () => call<RoleResult>({ type: 'roles' }),
   init: (options: InitOptions) => call<InitResult>({ type: 'init', options }),
   cuts: async (pack: Pack) => {

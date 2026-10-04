@@ -25,6 +25,10 @@ async function handle(req: Request): Promise<unknown> {
       }
       return out;
     }
+    case 'removeFiles':
+      for (const name of req.names) files.delete(name);
+      cache.clear();
+      return null;
     case 'roles':
       return assignRoles([...files.values()].map((f) => ({ file: f.name, raster: f.raster })));
     case 'init':

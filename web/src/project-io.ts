@@ -88,7 +88,9 @@ async function registerFiles(entries: { name: string; bytes: Uint8Array; role?: 
   const infos = await engine.addFiles(entries.map(({ name, bytes }) => ({ name: nfc(name), bytes })));
   for (const e of entries) {
     const info = infos.find((i) => i.name === nfc(e.name))!;
-    state.files.set(info.name, { name: info.name, bytes: e.bytes, width: info.width, height: info.height, bitmap: await makeBitmap(e.bytes), role: e.role ?? 'ignore' });
+    const bitmap = await makeBitmap(e.bytes);
+    state.files.get(info.name)?.bitmap.close();
+    state.files.set(info.name, { name: info.name, bytes: e.bytes, width: info.width, height: info.height, bitmap, role: e.role ?? 'ignore' });
   }
 }
 
@@ -108,6 +110,7 @@ export function scheduleAutosave(): void {
 }
 
 export async function addFiles(list: File[]): Promise<void> {
+  if (state.busy) return;
   await busy('Dosyalar okunuyor…', async () => {
     const zip = list.find((f) => /\.zip$/i.test(f.name));
     if (zip) return importZip(new Uint8Array(await zip.arrayBuffer()));
@@ -119,6 +122,20 @@ export async function addFiles(list: File[]): Promise<void> {
         f.role = f.name === roles.design ? 'design' : f.name === roles.background ? 'background' : roles.stickers.includes(f.name) ? 'sticker' : 'ignore';
       }
       s.messages = roles.reason ? [{ level: 'warning', code: 'ROLES', text: roles.reason }] : [];
+    });
+    scheduleAutosave();
+  });
+}
+
+export async function removeFile(name: string): Promise<void> {
+  const file = state.files.get(name);
+  if (!file || state.screen !== 'files' || state.busy) return;
+  await busy('Dosya kaldırılıyor…', async () => {
+    await engine.removeFiles([name]);
+    file.bitmap.close();
+    update((s) => {
+      s.files.delete(name);
+      s.messages = [];
     });
     scheduleAutosave();
   });
@@ -218,15 +235,21 @@ export async function exportZip(): Promise<void> {
 }
 
 export async function newProject(): Promise<void> {
-  await engine.reset();
-  clearTimeout(saveTimer);
-  await saveQueue;
-  await storage.clear();
-  for (const f of state.files.values()) f.bitmap.close();
-  editHistory.reset(null);
-  update((s) => {
-    s.files = new Map(); s.pack = null; s.cuts = new Map(); s.messages = []; s.cutMessages = [];
-    s.selectedId = null; s.screen = 'files';
+  if (state.busy) return;
+  await busy('Yeni proje hazırlanıyor…', async () => {
+    clearTimeout(saveTimer);
+    clearTimeout(cutTimer);
+    ++cutSeq;
+    await engine.reset();
+    await saveQueue;
+    await storage.clear();
+    for (const f of state.files.values()) f.bitmap.close();
+    editHistory.reset(null);
+    update((s) => {
+      s.files = new Map(); s.pack = null; s.cuts = new Map(); s.messages = []; s.cutMessages = [];
+      s.selectedId = null; s.screen = 'files'; s.showCuts = true;
+      s.page = { widthMm: 80, heightMm: null };
+    });
   });
 }
 

@@ -2,6 +2,7 @@ import type { InitOptions } from '../../src/core/pipeline';
 
 export type Request =
   | { type: 'addFiles'; files: { name: string; bytes: Uint8Array }[] }
+  | { type: 'removeFiles'; names: string[] }
   | { type: 'roles' }
   | { type: 'init'; options: InitOptions }
   | { type: 'cuts'; packJson: string }
