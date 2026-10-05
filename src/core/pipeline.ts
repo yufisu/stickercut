@@ -129,13 +129,14 @@ export function computeCuts(pack: Pack, assets: Map<string, Asset>, cache: CutCa
     const offsetRasterPx = round((s.offsetMm / (mm.x * item.scale)) * rasterPerOrig, 1);
     const simplifyMm = Number.isFinite(s.simplifyMm) ? Math.max(0, s.simplifyMm) : DEFAULT_SETTINGS.simplifyMm;
     const simplifyRasterPx = simplifyMm / (Math.max(mm.x, mm.y) * item.scale) * rasterPerOrig;
-    const key = `${item.file}|${offsetRasterPx}|${s.smoothing}|${s.alphaThreshold}|${round(simplifyRasterPx, 3)}`;
+    const cornerAngleDeg = Number.isFinite(s.cornerAngleDeg) ? Math.max(0, Math.min(180, s.cornerAngleDeg)) : DEFAULT_SETTINGS.cornerAngleDeg;
+    const key = `${item.file}|${offsetRasterPx}|${s.smoothing}|${s.alphaThreshold}|${round(simplifyRasterPx, 3)}|${cornerAngleDeg}`;
     let shape = cache.get(key);
     if (!shape) {
       try {
         shape = stickerCutShape(a.raster, {
           alphaThreshold: s.alphaThreshold, offsetPx: offsetRasterPx,
-          smoothing: s.smoothing, simplifyPx: simplifyRasterPx,
+          smoothing: s.smoothing, simplifyPx: simplifyRasterPx, cornerAngleDeg,
         });
       } catch (e) {
         if (!(e instanceof StickerError)) throw e;

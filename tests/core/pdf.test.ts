@@ -34,6 +34,7 @@ describe('buildPackPdf', () => {
     expect(cut.match(/\bh\b/g)).toHaveLength(3); // printOnly hariç 3 kapalı yol
     expect(cut).toMatch(/1 0 0 RG/);
     expect(cut).not.toMatch(/\bf\b/);
+    expect(cut).toMatch(/\bc\b/); // Simplify eğrileri PDF'de gerçek Bézier olarak kalır.
 
     const xobj = doc.getPage(0).node.Resources()!.lookup(PDFName.of('XObject'), PDFDict);
     const refs = new Set(xobj.values().map((v) => v.toString()));

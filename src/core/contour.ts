@@ -1,6 +1,7 @@
 import { type Mask, type Raster, alphaMask, downscaleMask, largestComponent, fillHoles } from './raster';
 import { offsetMask } from './distance';
-import type { Pt } from './geometry';
+import { transformPoints, type Pt } from './geometry';
+import { contourCorners, fitClosedCurves } from './curve-fit';
 
 export interface CutShapeOptions {
   alphaThreshold: number;
@@ -10,6 +11,7 @@ export interface CutShapeOptions {
   smoothing: number;
   /** Kaynak raster pikseli cinsinden en büyük sadeleştirme sapması. */
   simplifyPx: number;
+  cornerAngleDeg?: number;
   maxWorkSize?: number;
 }
 export interface CutShape { points: Pt[]; extraPartsRatio: number }
@@ -149,14 +151,32 @@ export function stickerCutShape(r: Raster, o: CutShapeOptions): CutShape {
     throw new StickerError('OFFSET_EMPTY', 'İçe ofset sticker şeklini tamamen siliyor; değeri azaltın.');
   }
   const window = 1 + 2 * Math.round(Math.max(0, Math.min(1, o.smoothing)) * 6);
-  const tolerance = Math.max(0.5, Math.max(0, o.simplifyPx) / Math.max(sx, sy));
-  const simplified = simplifyClosed(smoothClosed(traceBoundary(insetShape.mask), window), tolerance);
+  const tolerance = Math.max(0, o.simplifyPx) / Math.max(sx, sy);
+  const boundary = traceBoundary(insetShape.mask);
+  const corners = contourCorners(boundary, o.cornerAngleDeg ?? 100, Math.max(3, window));
+  const smoothed = smoothClosed(boundary, window);
+  // Do not average across a hard corner: each adjacent straight edge stays straight.
+  const hard = new Set(corners), half = boundary.length >= window ? window >> 1 : 0, n = boundary.length;
+  for (let i = 0; i < n; i++) {
+    if (hard.has(i)) { smoothed[i] = boundary[i]; continue; }
+    if (!corners.length) continue;
+    let x = boundary[i].x, y = boundary[i].y, count = 1;
+    for (const direction of [-1, 1]) {
+      for (let k = 1; k <= half; k++) {
+        const j = (i + direction * k + n) % n;
+        x += boundary[j].x; y += boundary[j].y; count++;
+        if (hard.has(j)) break;
+      }
+    }
+    smoothed[i] = { x: x / count, y: y / count };
+  }
+  const simplified = fitClosedCurves(smoothed, tolerance, corners);
   const maxOther = Math.max(
     otherAreas.reduce((m, a) => Math.max(m, a), 0),
     insetShape.otherAreas.reduce((m, a) => Math.max(m, a), 0),
   );
   return {
-    points: simplified.map((p) => ({ x: (p.x - pad + 0.5) * sx, y: (p.y - pad + 0.5) * sy })),
+    points: transformPoints([sx, 0, 0, sy, (0.5 - pad) * sx, (0.5 - pad) * sy], simplified),
     extraPartsRatio: Math.max(maxOther / area, maxOther / insetShape.area),
   };
 }

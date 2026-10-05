@@ -78,8 +78,10 @@ export function mountEditor(root: HTMLElement): () => void {
           <label>Çizgi (pt)<input data-k="d.strokeWidthPt" type="number" step="0.05" min="0.05" value="${d.strokeWidthPt}"></label>
         </div>
         <label>Yumuşatma<input data-k="d.smoothing" type="range" min="0" max="1" step="0.05" value="${d.smoothing}"></label>
-        <label>Nokta azaltma <output>${d.simplifyMm.toFixed(2)} mm</output><input data-k="d.simplifyMm" aria-label="Genel nokta azaltma" type="range" min="0" max="0.3" step="0.01" value="${d.simplifyMm}"></label>
-        <p class="lead">Değer, kesim çizgisinin izin verilen yaklaşık sapmasıdır; sağa kaydırdıkça nokta azalır.</p>
+        <label>Simplify / nokta azaltma <output>${d.simplifyMm.toFixed(2)} mm</output><input data-k="d.simplifyMm" aria-label="Genel nokta azaltma" type="range" min="0" max="1" step="0.01" value="${d.simplifyMm}"></label>
+        <p class="lead">0, ayrıntılı konturu korur. Artırdıkça eğriyi daha az noktayla izler; değer, yumuşatılmış konturdan izin verilen yaklaşık sapmadır.</p>
+        <label>Köşe koruma <output>${d.cornerAngleDeg}°</output><input data-k="d.cornerAngleDeg" aria-label="Genel köşe koruma" type="range" min="0" max="180" step="5" value="${d.cornerAngleDeg}"></label>
+        <p class="lead">Bu açıdan daha sivri köşeleri korur. 0° korumayı kapatır; yüksek değer daha fazla köşeyi tutar.</p>
         <label class="check"><input data-k="d.whiteBorder" type="checkbox"${d.whiteBorder ? ' checked' : ''}> Beyaz kenar</label>
         <label class="check"><input data-k="showCuts" type="checkbox"${state.showCuts ? ' checked' : ''}> Kesim çizgilerini göster</label>
       </section>
@@ -91,8 +93,10 @@ export function mountEditor(root: HTMLElement): () => void {
           <label>Döndürme (°)<input data-k="i.rotationDeg" type="number" step="1" value="${item.rotationDeg}"></label>
         </div>
         <p class="lead">Yalnızca bu sticker’ın kesimini içeri almak için örneğin -0.5 yaz. Pozitif değer dışa taşır; boş bırakırsan genel ayar kullanılır.</p>
-        <label>Bu sticker için nokta azaltma <output>${(item.overrides.simplifyMm ?? d.simplifyMm).toFixed(2)} mm</output><input data-k="i.simplifyMm" aria-label="Seçili sticker nokta azaltma" type="range" min="0" max="0.3" step="0.01" value="${item.overrides.simplifyMm ?? d.simplifyMm}"></label>
+        <label>Bu sticker için nokta azaltma <output>${(item.overrides.simplifyMm ?? d.simplifyMm).toFixed(2)} mm</output><input data-k="i.simplifyMm" aria-label="Seçili sticker nokta azaltma" type="range" min="0" max="1" step="0.01" value="${item.overrides.simplifyMm ?? d.simplifyMm}"></label>
         ${item.overrides.simplifyMm !== undefined ? '<button data-act="resetSimplify">Genel ayarı kullan</button>' : ''}
+        <label>Bu sticker için köşe koruma <output>${item.overrides.cornerAngleDeg ?? d.cornerAngleDeg}°</output><input data-k="i.cornerAngleDeg" aria-label="Seçili sticker köşe koruma" type="range" min="0" max="180" step="5" value="${item.overrides.cornerAngleDeg ?? d.cornerAngleDeg}"></label>
+        ${item.overrides.cornerAngleDeg !== undefined ? '<button data-act="resetCorners">Genel köşe ayarını kullan</button>' : ''}
         <p class="lead" id="cutPoints"></p>
         <label>Beyaz kenar<select data-k="i.whiteBorder">
           <option value=""${wb === undefined ? ' selected' : ''}>Varsayılan</option>
@@ -169,7 +173,8 @@ export function mountEditor(root: HTMLElement): () => void {
       case 'd.offsetMm': if (el.value !== '' && Number.isFinite(n)) pack.defaults.offsetMm = n; else return; break;
       case 'd.strokeWidthPt': if (n > 0) pack.defaults.strokeWidthPt = n; else return; break;
       case 'd.smoothing': if (n >= 0 && n <= 1) pack.defaults.smoothing = n; else return; break;
-      case 'd.simplifyMm': if (n >= 0 && n <= 0.3) pack.defaults.simplifyMm = n; else return; break;
+      case 'd.simplifyMm': if (n >= 0 && n <= 1) pack.defaults.simplifyMm = n; else return; break;
+      case 'd.cornerAngleDeg': if (n >= 0 && n <= 180) pack.defaults.cornerAngleDeg = n; else return; break;
       case 'd.whiteBorder': pack.defaults.whiteBorder = (el as HTMLInputElement).checked; break;
       case 'showCuts': update((s) => { s.showCuts = (el as HTMLInputElement).checked; }); return;
       case 'i.file': if (item) item.file = el.value; break;
@@ -177,7 +182,8 @@ export function mountEditor(root: HTMLElement): () => void {
         if (item) { if (el.value === '') delete item.overrides.offsetMm; else if (Number.isFinite(n)) item.overrides.offsetMm = n; else return; }
         break;
       case 'i.rotationDeg': if (item && el.value !== '' && Number.isFinite(n)) item.rotationDeg = n; else return; break;
-      case 'i.simplifyMm': if (item && n >= 0 && n <= 0.3) item.overrides.simplifyMm = n; else return; break;
+      case 'i.simplifyMm': if (item && n >= 0 && n <= 1) item.overrides.simplifyMm = n; else return; break;
+      case 'i.cornerAngleDeg': if (item && n >= 0 && n <= 180) item.overrides.cornerAngleDeg = n; else return; break;
       case 'i.whiteBorder':
         if (item) { if (el.value === '') delete item.overrides.whiteBorder; else item.overrides.whiteBorder = el.value === '1'; }
         break;
@@ -187,6 +193,10 @@ export function mountEditor(root: HTMLElement): () => void {
     if (k === 'd.simplifyMm' || k === 'i.simplifyMm') {
       const output = el.parentElement?.querySelector('output');
       if (output) output.textContent = `${n.toFixed(2)} mm`;
+    }
+    if (k === 'd.cornerAngleDeg' || k === 'i.cornerAngleDeg') {
+      const output = el.parentElement?.querySelector('output');
+      if (output) output.textContent = `${n}°`;
     }
     commit();
     if (redrawFields) renderSettings();
@@ -225,6 +235,7 @@ export function mountEditor(root: HTMLElement): () => void {
     const item = pack.items.find((i) => i.id === state.selectedId);
     if (act === 'approve' && item) { item.needsReview = false; commit(); renderSettings(); }
     if (act === 'resetSimplify' && item) { delete item.overrides.simplifyMm; commit(); renderSettings(); }
+    if (act === 'resetCorners' && item) { delete item.overrides.cornerAngleDeg; commit(); renderSettings(); }
     if (act === 'delete' && item) deleteSelected();
     if (act === 'add') { const v = $<HTMLSelectElement>('#addFile').value; if (v) { addStickerItem(v); renderSettings(); } }
     if (act === 'addNew') $<HTMLInputElement>('#addPick').click();

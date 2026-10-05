@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMask, type Raster } from '../../src/core/raster';
 import { traceBoundary, simplifyClosed, stickerCutShape, StickerError } from '../../src/core/contour';
+import { flattenClosedPath, polygonBounds } from '../../src/core/geometry';
 
 function raster(size: number, fn: (x: number, y: number) => number): Raster {
   const data = new Uint8ClampedArray(size * size * 4);
@@ -73,9 +74,30 @@ describe('stickerCutShape', () => {
       return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
     };
     expect(detailed.length).toBeGreaterThan(50);
-    expect(simplified).toHaveLength(4);
+    expect(simplified.length).toBeLessThan(detailed.length / 10);
+    const flat = flattenClosedPath(simplified, 0.01);
     for (const point of detailed) {
-      expect(Math.min(...simplified.map((p, i) => distanceToSegment(point, p, simplified[(i + 1) % simplified.length])))).toBeLessThanOrEqual(3);
+      expect(Math.min(...flat.map((p, i) => distanceToSegment(point, p, flat[(i + 1) % flat.length])))).toBeLessThanOrEqual(3.01);
+    }
+  });
+
+  it('sıfır sadeleştirmede ham konturu korur, pozitif değerde eğri kontrolleri üretir', () => {
+    const r = raster(400, (x, y) => (inCircle(x, y, 200, 200, 100) ? 255 : 0));
+    const detailed = stickerCutShape(r, { ...opts, smoothing: 0, simplifyPx: 0 }).points;
+    const fitted = stickerCutShape(r, { ...opts, simplifyPx: 1 }).points;
+    expect(detailed.length).toBeGreaterThan(500);
+    expect(detailed.every((p) => !p.handleIn && !p.handleOut)).toBe(true);
+    expect(fitted.length).toBeLessThan(20);
+    expect(fitted.some((p) => p.handleIn && p.handleOut)).toBe(true);
+  });
+
+  it('yüksek yumuşatmada çok küçük şeffaf konturları çökertmez', () => {
+    for (const size of [2, 3]) {
+      const r = raster(10, (x, y) => x >= 3 && x < 3 + size && y >= 3 && y < 3 + size ? 255 : 0);
+      const raw = stickerCutShape(r, { ...opts, smoothing: 0 }).points;
+      const smoothed = stickerCutShape(r, { ...opts, smoothing: 1 }).points;
+      expect(smoothed).toEqual(raw);
+      expect(polygonBounds(smoothed)).toEqual({ minX: 3.5, minY: 3.5, maxX: size + 2.5, maxY: size + 2.5 });
     }
   });
 

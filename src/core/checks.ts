@@ -1,6 +1,6 @@
 import type { Pack } from './project';
 import { aspectMismatch } from './project';
-import { type Pt, polygonBounds, pointInPolygon } from './geometry';
+import { type Pt, polygonBounds, pointInPolygon, flattenClosedPath } from './geometry';
 import type { Message } from './pipeline';
 
 export function checkLayout(pack: Pack, cuts: Map<string, Pt[]>): Message[] {
@@ -14,7 +14,7 @@ export function checkLayout(pack: Pack, cuts: Map<string, Pt[]>): Message[] {
     });
   }
   const { widthPx: W, heightPx: H } = pack.designSize;
-  const entries = [...cuts.entries()].map(([id, pts]) => ({ id, pts, b: polygonBounds(pts) }));
+  const entries = [...cuts.entries()].map(([id, pts]) => ({ id, pts: flattenClosedPath(pts), b: polygonBounds(pts) }));
   for (const e of entries) {
     if (e.b.minX < 0 || e.b.minY < 0 || e.b.maxX > W || e.b.maxY > H) {
       out.push({ level: 'warning', code: 'OUTSIDE_PAGE', itemId: e.id, text: `${e.id} kesim çizgisi sayfanın dışına taşıyor.` });

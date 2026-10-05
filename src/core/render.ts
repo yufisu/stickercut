@@ -1,5 +1,5 @@
 import type { Raster } from './raster';
-import { type Affine, type Pt, apply, invert } from './geometry';
+import { type Affine, type Pt, apply, invert, flattenPath } from './geometry';
 
 export function createRaster(w: number, h: number): Raster {
   return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
@@ -87,6 +87,7 @@ export function downscaleRaster(r: Raster, f: number): Raster {
 export function strokePolyline(
   dst: Raster, pts: Pt[], closed: boolean, color: [number, number, number], width: number,
 ): void {
+  if (pts.some((p) => p.handleIn || p.handleOut)) pts = flattenPath(pts, closed);
   const r = width / 2, r2 = r * r;
   const stamp = (cx: number, cy: number) => {
     for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {

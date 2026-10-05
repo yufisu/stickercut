@@ -10,7 +10,7 @@ Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden düz
 
 Dosya seçimi ekranında yanlış yüklediğin PNG'yi **Kaldır** ile listeden çıkarabilir, **Baştan başla** ile tüm dosyaları ve otomatik kaydı temizleyebilirsin. Yeni dosyaları aynı alandan ekleyebilirsin; editöre geçmen gerekmez.
 
-Sticker seçiliyken **Kesim ofseti (mm)** alanına `-0.5` girerek yalnızca o sticker'ın kesim çizgisini yarım milimetre içeri alabilirsin. Pozitif değer çizgiyi dışarı taşır; alanı boşaltmak genel ayara döner. **Nokta azaltma** kaydırıcısı çizgideki gereksiz noktaları azaltır ve seçili sticker'ın nokta sayısı anlık gösterilir. Birden fazla tam tasarım/arka plan adayı varsa dosya yükleme ekranındaki seçim alanlarını veya editördeki **Kaynak görseller** bölümünü kullan.
+Sticker seçiliyken **Kesim ofseti (mm)** alanına `-0.5` girerek yalnızca o sticker'ın kesim çizgisini yarım milimetre içeri alabilirsin. Pozitif değer çizgiyi dışarı taşır; alanı boşaltmak genel ayara döner. **Simplify / nokta azaltma** kaydırıcısı yumuşatılmış konturu daha az noktalı Bézier eğrileriyle izler; değer, baskı boyutunda izin verilen yaklaşık sapmadır. `0` sadeleştirmeyi kapatır. **Köşe koruma**, seçilen açıdan daha sivri köşeleri korur (`0°` korumayı kapatır). Her iki ayar sticker'a özel değiştirilebilir; seçili sticker'ın nokta sayısı anlık gösterilir. Önizleme ve PDF aynı eğriyi kullanır. Birden fazla tam tasarım/arka plan adayı varsa dosya yükleme ekranındaki seçim alanlarını veya editördeki **Kaynak görseller** bölümünü kullan.
 
 ## CLI
 

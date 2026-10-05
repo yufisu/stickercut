@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   multiply, apply, invert, itemMatrix, transformPoints, closedPathSvg,
   polygonBounds, pointInPolygon, type Affine,
+  flattenClosedPath, flattenPath, type Pt,
 } from '../../src/core/geometry';
 
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -43,5 +44,49 @@ describe('geometry', () => {
     expect(polygonBounds(sq)).toEqual({ minX: 5, minY: 5, maxX: 15, maxY: 15 });
     expect(pointInPolygon({ x: 10, y: 10 }, sq)).toBe(true);
     expect(pointInPolygon({ x: 1, y: 10 }, sq)).toBe(false);
+  });
+
+  it('transforms absolute Bezier handles with rotation, scale and translation', () => {
+    const points: Pt[] = [{ x: 2, y: 3, handleIn: { x: 1, y: 3 }, handleOut: { x: 2, y: 5 } }];
+    const transformed = transformPoints([0, 2, -2, 0, 10, 20], points);
+    expect(transformed).toEqual([{ x: 4, y: 24, handleIn: { x: 4, y: 22 }, handleOut: { x: 0, y: 24 } }]);
+    expect(points[0].handleOut).toEqual({ x: 2, y: 5 });
+  });
+
+  it('emits closing Beziers and falls back to anchors for a missing handle', () => {
+    const points: Pt[] = [
+      { x: 0, y: 0, handleIn: { x: -10, y: 0 } },
+      { x: 10, y: 0, handleOut: { x: 10, y: 5 } },
+      { x: 0, y: 10, handleOut: { x: -10, y: 10 } },
+    ];
+    expect(closedPathSvg(points)).toBe('M 0 0 L 10 0 C 10 5 0 10 0 10 C -10 10 -10 0 0 0 Z');
+    const flat = flattenClosedPath(points, 0.1);
+    expect(flat.some((p) => p.x === -7.5 && p.y === 5)).toBe(true);
+    expect(flat.every((p) => !p.handleIn && !p.handleOut)).toBe(true);
+    expect(flat.at(-1)).not.toEqual(flat[0]);
+    expect(flattenPath(points, false).every((p) => p.x >= 0)).toBe(true);
+  });
+
+  it('bounds use actual curve extrema including the closing segment', () => {
+    const points: Pt[] = [
+      { x: 0, y: 0, handleIn: { x: -10, y: 0 }, handleOut: { x: 0, y: -10 } },
+      { x: 10, y: 0, handleIn: { x: 10, y: -10 } },
+      { x: 10, y: 10 },
+      { x: 0, y: 10, handleOut: { x: -10, y: 10 } },
+    ];
+    expect(polygonBounds(points)).toEqual({ minX: -7.5, minY: -7.5, maxX: 10, maxY: 10 });
+  });
+
+  it('hit tests curved outlines and invalidates flattening after a handle edit', () => {
+    const points: Pt[] = [
+      { x: 0, y: 0, handleOut: { x: 0, y: -10 } },
+      { x: 10, y: 0, handleIn: { x: 10, y: -10 } },
+      { x: 10, y: 10 }, { x: 0, y: 10 },
+    ];
+    expect(pointInPolygon({ x: 5, y: -5 }, points)).toBe(true);
+    expect(pointInPolygon({ x: 5, y: -8 }, points)).toBe(false);
+    points[0].handleOut!.y = -4;
+    points[1].handleIn!.y = -4;
+    expect(pointInPolygon({ x: 5, y: -5 }, points)).toBe(false);
   });
 });

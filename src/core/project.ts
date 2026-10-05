@@ -5,6 +5,8 @@ export interface Settings {
   smoothing: number;
   /** Kesim yolunun izin verilen en büyük sadeleştirme sapması (mm). */
   simplifyMm: number;
+  /** Bu açıdan daha sivri köşeler sadeleştirilirken korunur (0 = koruma kapalı). */
+  cornerAngleDeg: number;
   alphaThreshold: number;
 }
 
@@ -14,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   strokeWidthPt: 1,
   smoothing: 0.5,
   simplifyMm: 0.06,
+  cornerAngleDeg: 100,
   alphaThreshold: 128,
 };
 
