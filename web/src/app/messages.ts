@@ -2,7 +2,7 @@ import type { Pack } from '../../../src/core/project';
 import { itemLabel } from '../../../src/core/project';
 import type { Message } from '../../../src/core/pipeline';
 import { legacyRegion, unmatchedRegionText } from '../../../src/core/region-label';
-import { regionItemText } from '../../../src/core/pipeline';
+import { regionItemText } from '../../../src/core/region';
 
 export const NEEDS_REVIEW_TEXT = (label: string) => `"${label}" otomatik yerleşimi belirsiz. Önizlemede turuncu çerçeveye dokunup konumunu kontrol et.`;
 

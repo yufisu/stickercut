@@ -5,7 +5,7 @@ Plan: `~/.claude/plans/noble-finding-aho.md` (onaylandı, 14 Ekim 2026). Kararla
 ## Faz 0 — Araç zinciri
 - [x] tasks/todo.md + tasks/lessons.md
 - [x] preact, @preact/signals, @playwright/test; JSX ayarı (tsconfig + vite)
-- [ ] Playwright smoke (mevcut UI'a karşı), `npm run test:e2e` — yazıldı, ilk koşuda zaman aşımı; expect süresi artırıldı, tekrar koşuyor
+- [x] Playwright smoke, `npm run test:e2e` — yeni arayüzde Chromium + iPad WebKit geçiyor
 
 ## Faz 1 — Kesim motoru v2
 - [x] distance.ts: signedDistance / thresholdField / closeMask / openMask (Float32)
@@ -21,23 +21,28 @@ Plan: `~/.claude/plans/noble-finding-aho.md` (onaylandı, 14 Ekim 2026). Kararla
 - [x] pdf.ts seçenekleri (pages, OCG, labels, bleed, spot) + testler
 - [x] svg.ts, png-encode.ts, export-png.ts, package.ts + testler; CLI build bayrakları; doctor
 - [x] index.ts export'ları
-- [ ] AGENTS/README/skill (Faz 5'te tek geçişte)
+- [x] AGENTS/README/skill
 
 ## Faz 3 — Web mimarisi
-- [ ] app/store + actions + cut-key + history (coalesce) + presets + sample-pack
-- [ ] engine v2 (kuyruk, ilerleme, iptal, akış) + core jeneratörler
-- [ ] storage anahtar ayrımı; JobOverlay
+- [x] app/store + actions + cut-key + history (coalesce) + presets + sample-pack
+- [x] engine v2 (kuyruk, ilerleme, iptal, akış) + core jeneratörler
+- [x] storage anahtar ayrımı (eski kayıt taşınır); JobOverlay
 
 ## Faz 4 — Editör (Atölye)
-- [ ] EditorScreen: ToolRail, Inspector sekmeleri, LayersPanel, StatusBar, ViewModeSwitch, ZoomControls
-- [ ] editor/: camera, renderer, controller, hit, snap, rulers, grid, align
-- [ ] SetupScreen: DropZone, FileCard + rol çipleri, PageSetup, PresetPicker, örnek pack, referans PDF
-- [ ] iPad: BottomSheet, SlideOver, alt araç çubuğu, safe-area, paylaşım toast'u
-- [ ] Kontrol sekmesi + referans karşılaştırma + dışa aktarma seçenekleri
+- [x] EditorScreen: ToolRail, Inspector sekmeleri, LayersPanel, StatusBar, ViewModeSwitch, ZoomControls
+- [x] editor/: camera, renderer, controller, hit, snap, rulers, grid, align (alt ajan + testler)
+- [x] SetupScreen: DropZone, FileCard + rol seçimi, PageSetup, PresetPicker, örnek pack
+- [x] iPad: BottomSheet, SlideOver, alt araç çubuğu, safe-area, paylaşım toast'u
+- [x] Kontrol sekmesi + referans karşılaştırma + dışa aktarma menüsü
 
 ## Faz 5 — Cila ve yayın
-- [ ] Tema token'ları + koyu toggle, klavye haritası, kısayol yardımı, erişilebilirlik
-- [ ] e2e genişletme; gerçek pack görsel doğrulama; README/AGENTS; publish:pages
+- [x] Tema token'ları + koyu toggle, klavye haritası, kısayol yardımı, erişilebilirlik temelleri
+- [x] e2e yeni akış; gerçek kahve pack'i tarayıcıda uçtan uca (PDF + baskıcı paketi); README/AGENTS
+- [x] tests/web/actions.test.ts (eski files.test yerine)
+- [x] publish:pages + main push
 
-## Gözden geçirme
-(fazlar bitince doldurulacak)
+## Gözden geçirme (14 Ekim 2026)
+- Motor: 13/13 kahve kesimi G1, 6–12 anchor, düz segment yok, çizime giriş ≤ 0.09 mm; sticker başına 80–520 ms (Mac, node).
+- Araçlar: bölge öğeleri (PNG'siz), compare/doctor, OCG katmanlı/spot renkli PDF, SVG, sticker PNG zip, baskıcı paketi.
+- Web: Preact + signals, worker v2 (ilerleme/iptal), Atölye editör; ana chunk 54 kB gz, worker 508 kB (pdf-lib).
+- Açık noktalar: Illustrator'da OCG katmanlarının görünümü kullanıcı tarafından denenmeli; iPad'de gerçek cihaz süresi ölçülmedi (tahmin: 2× Mac); pinch zoom yalnızca kodla doğrulandı.

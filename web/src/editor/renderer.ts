@@ -160,16 +160,6 @@ export function drawScene(g: CanvasRenderingContext2D, f: Frame): void {
     g.restore();
   }
 
-  // Referans (Illustrator) yolları
-  if (f.reference && f.showReference && f.mode !== 'print') {
-    g.save();
-    g.fillStyle = palette.referenceFill;
-    for (const b of f.reference.borders) g.fill(pathOf(b));
-    g.strokeStyle = palette.reference; g.lineWidth = 1.5 * lineW; g.setLineDash([6 * lineW, 4 * lineW]);
-    for (const c of f.reference.cuts) g.stroke(pathOf(c));
-    g.restore();
-  }
-
   // Kesim çizgileri
   const showCuts = f.mode === 'cut' || (f.mode === 'edit' && f.prefs.showCuts);
   if (showCuts) {
@@ -188,6 +178,16 @@ export function drawScene(g: CanvasRenderingContext2D, f: Frame): void {
     }
     g.restore();
   }
+  // Referans (Illustrator) yolları
+  if (f.reference && f.showReference && f.mode !== 'print') {
+    g.save();
+    g.fillStyle = palette.referenceFill;
+    for (const b of f.reference.borders) g.fill(pathOf(b));
+    g.strokeStyle = palette.reference; g.lineWidth = 2 * lineW; g.setLineDash([8 * lineW, 5 * lineW]); g.lineJoin = 'round';
+    for (const c of f.reference.cuts) g.stroke(pathOf(c));
+    g.restore();
+  }
+
   g.restore();
 }
 

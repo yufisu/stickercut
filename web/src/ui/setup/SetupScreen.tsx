@@ -80,7 +80,7 @@ export function SetupScreen() {
     <div class="setup desk-bg">
       <header class="setup-head">
         <div class="wordmark"><h1>stickercut</h1><span class="tag">kesim çizgisi atölyesi</span></div>
-        <div class="row" style={{ display: 'flex', gap: 6 }}>
+        <div class="row" style={{ display: 'flex', gap: '6px' }}>
           {!files.length ? <button type="button" class="btn quiet" disabled={disabled} onClick={() => void loadSamplePack()}><Icon name="sparkle" /> Örnek pack'i dene</button> : null}
           {files.length ? <button type="button" class="btn quiet danger" disabled={disabled} onClick={() => void newProject()}><Icon name="restart" /> Baştan başla</button> : null}
           <ThemeToggle />

@@ -143,7 +143,7 @@ export function Thumb({ bitmap, size = 96, class: cls }: { bitmap: ImageBitmap; 
     g.imageSmoothingQuality = 'high';
     g.drawImage(bitmap, (c.width - bitmap.width * k) / 2, (c.height - bitmap.height * k) / 2, bitmap.width * k, bitmap.height * k);
   }, [bitmap, size]);
-  return <canvas ref={ref} class={cls} style={{ width: size, height: size }} aria-hidden="true" />;
+  return <canvas ref={ref} class={cls} style={{ width: `${size}px`, height: `${size}px` }} aria-hidden="true" />;
 }
 
 export function Kbd({ children }: { children: ComponentChildren }) { return <kbd class="kbd">{children}</kbd>; }

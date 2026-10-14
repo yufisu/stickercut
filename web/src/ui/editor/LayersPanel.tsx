@@ -22,7 +22,7 @@ function RegionThumb({ item }: { item: Item }) {
     const s = Math.min(c.width / (bbox.w * k), c.height / (bbox.h * k));
     g.drawImage(design.bitmap, bbox.x * k, bbox.y * k, bbox.w * k, bbox.h * k, (c.width - bbox.w * k * s) / 2, (c.height - bbox.h * k * s) / 2, bbox.w * k * s, bbox.h * k * s);
   }, [item, design]);
-  return <canvas ref={ref} style={{ width: 36, height: 36 }} aria-hidden="true" />;
+  return <canvas ref={ref} style={{ width: '36px', height: '36px' }} aria-hidden="true" />;
 }
 
 function LayerRow({ item, index, total }: { item: Item; index: number; total: number }) {
@@ -65,7 +65,7 @@ export function AddStickerControl() {
   const stickers = [...store.files.value.values()].filter((f) => f.name !== doc.files.design && f.name !== doc.files.background);
   const options = [{ value: '', label: 'Yüklü sticker seç…' }, ...stickers.map((f) => ({ value: f.name, label: f.name }))];
   return (
-    <div class="row" style={{ display: 'flex', gap: 6 }}>
+    <div class="row" style={{ display: 'flex', gap: '6px' }}>
       <Select class="sm" value={file} options={options} ariaLabel="Eklenecek sticker" onChange={setFile} />
       <button type="button" class="btn sm" disabled={!file || busy.value} onClick={() => { if (file) addStickerItem(file); }}>Ekle</button>
       <input ref={pick} type="file" accept=".png,.PNG,image/png" hidden onChange={() => { const f = pick.current?.files?.[0]; if (pick.current) pick.current.value = ''; if (f) void addNewPng(f); }} />

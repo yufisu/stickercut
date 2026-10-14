@@ -26,7 +26,7 @@ export function JobOverlay() {
       ) : null}
       {!blocking && background.length ? (
         <div class="job-pill" role="status" aria-live="polite">
-          <span class="progress" style={{ width: 60 }}><span style={{ display: 'block', height: '100%', width: background[0].total ? `${(100 * background[0].done) / background[0].total}%` : '40%', background: 'var(--accent)' }} /></span>
+          <span class="progress" style={{ width: '60px' }}><span style={{ display: 'block', height: '100%', width: background[0].total ? `${(100 * background[0].done) / background[0].total}%` : '40%', background: 'var(--accent)' }} /></span>
           <span>{background[0].label}{background[0].total ? ` ${background[0].done}/${background[0].total}` : ''}</span>
         </div>
       ) : null}

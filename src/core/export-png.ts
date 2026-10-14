@@ -1,4 +1,5 @@
-import { type Asset, type Message, regionRaster } from './pipeline';
+import type { Asset, Message } from './pipeline';
+import { regionRaster } from './region';
 import { type Item, type Pack, effectiveSettings, mmPerDesignPx, isRegionItem, itemLabel } from './project';
 import { type Affine, type Pt, flattenPath, itemMatrix, multiply, polygonBounds, transformPoints } from './geometry';
 import type { Raster } from './raster';

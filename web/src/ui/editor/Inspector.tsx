@@ -239,7 +239,7 @@ function QaTab() {
         <h3>Durum</h3>
         {!counts.errors && !counts.warnings ? <div class="msg info"><span class="dot" /><span>Sorun görünmüyor; baskıya hazır.</span></div> : null}
         {groups.map((g) => (
-          <div key={g.level} style={{ display: 'grid', gap: 6 }}>
+          <div key={g.level} style={{ display: 'grid', gap: '6px' }}>
             <span class="small muted">{g.title}</span>
             {g.items.map((m, k) => {
               const it = itemFor(m.itemId);
@@ -252,7 +252,7 @@ function QaTab() {
                     {it?.needsReview ? <button type="button" class="btn sm" onClick={() => approve([it.id])}>Yeri doğru</button> : null}
                     {m.code === 'UNUSED_STICKER' && m.file ? <button type="button" class="btn sm" onClick={() => addStickerItem(m.file!)}>Ekle</button> : null}
                     {m.code === 'UNMATCHED_REGION' && m.marker ? <>
-                      <select class="select" style={{ minHeight: 28, width: 120, fontSize: 12 }} value={regionFile} aria-label="Bölgeye yerleştirilecek sticker" onChange={(e) => setRegionFile((e.target as HTMLSelectElement).value)}>
+                      <select class="select" style={{ minHeight: '28px', width: '120px', fontSize: '12px' }} value={regionFile} aria-label="Bölgeye yerleştirilecek sticker" onChange={(e) => setRegionFile((e.target as HTMLSelectElement).value)}>
                         <option value="">Sticker seç…</option>{stickers.map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
                       </select>
                       <button type="button" class="btn sm" disabled={!regionFile} onClick={() => placeInRegion(m.marker!, regionFile)}>Yerleştir</button>
@@ -295,14 +295,14 @@ function ExportMenu() {
     <div style={{ position: 'relative' }}>
       <button type="button" class="btn" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(!open)}><Icon name="more" size={16} /></button>
       {open ? (
-        <div class="hud-pop" role="menu" style={{ position: 'absolute', right: 0, bottom: '100%', left: 'auto', transform: 'translateY(-8px)', width: 300 }}>
+        <div class="hud-pop" role="menu" style={{ position: 'absolute', right: '0', bottom: '100%', left: 'auto', transform: 'translateY(-8px)', width: '300px' }}>
           <button type="button" class="btn sm" role="menuitem" onClick={() => { setOpen(false); void exportCutOnlyPdf(); }}><Icon name="cut" size={14} /> Yalnızca kesim PDF'i</button>
           <button type="button" class="btn sm" role="menuitem" onClick={() => { setOpen(false); void exportSvg('cut'); }}><Icon name="svg" size={14} /> Kesim SVG</button>
           <button type="button" class="btn sm" role="menuitem" onClick={() => { setOpen(false); void exportSvg('both'); }}><Icon name="svg" size={14} /> Baskı + kesim SVG</button>
           <button type="button" class="btn sm" role="menuitem" onClick={() => { setOpen(false); void exportPngs(); }}><Icon name="image" size={14} /> Sticker PNG'leri (.zip, {o.pngDpi} dpi)</button>
           <button type="button" class="btn sm" role="menuitem" onClick={() => { setOpen(false); void exportPackage(); }}><Icon name="package" size={14} /> Baskıcı paketi (.zip)</button>
           <button type="button" class="btn sm" role="menuitem" onClick={() => { setOpen(false); void exportZip(); }}><Icon name="zip" size={14} /> Proje (.zip)</button>
-          <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: 0 }} />
+          <hr style={{ border: '0', borderTop: '1px solid var(--line)', margin: '0' }} />
           <Check checked={o.layers} onChange={(v) => setO({ layers: v })}>PDF'de "Baskı / Kesim" katmanları</Check>
           <Check checked={o.spotColor} onChange={(v) => setO({ spotColor: v })}>Kesimi spot renkle yaz ({o.spotName})</Check>
           <div class="grid2">

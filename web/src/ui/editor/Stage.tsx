@@ -23,7 +23,7 @@ function AddPopover({ at, screen, onClose }: { at: Coord; screen: Coord; onClose
   const pick = useRef<HTMLInputElement>(null);
   const stickers = [...store.files.value.values()].filter((f) => f.name !== doc.files.design && f.name !== doc.files.background);
   return (
-    <div class="hud-pop" style={{ left: screen.x, top: screen.y }} role="dialog" aria-label="Sticker ekle">
+    <div class="hud-pop" style={{ left: `${screen.x}px`, top: `${screen.y}px` }} role="dialog" aria-label="Sticker ekle">
       <b>Buraya sticker ekle</b>
       {stickers.length ? <div class="row">{stickers.map((f) => <button key={f.name} type="button" class="btn sm" onClick={() => { addStickerItem(f.name, at); onClose(); }}>{f.name}</button>)}</div> : <p class="muted small">Yüklü sticker yok.</p>}
       <div class="row">
@@ -41,7 +41,7 @@ function RegionPopover({ rect, screen, onClose }: { rect: { x: number; y: number
   const stickers = [...store.files.value.values()].filter((f) => f.name !== doc.files.design && f.name !== doc.files.background);
   const mm = mmPerDesignPx(doc);
   return (
-    <div class="hud-pop" style={{ left: screen.x, top: screen.y }} role="dialog" aria-label="Bölgeye yerleştir">
+    <div class="hud-pop" style={{ left: `${screen.x}px`, top: `${screen.y}px` }} role="dialog" aria-label="Bölgeye yerleştir">
       <b>Bu bölgeye yerleştir <span class="muted small num">({(rect.w * mm.x).toFixed(1)} × {(rect.h * mm.y).toFixed(1)} mm)</span></b>
       <Select value={file} ariaLabel="Sticker" options={[{ value: '', label: 'Sticker seç…' }, ...stickers.map((f) => ({ value: f.name, label: f.name }))]} onChange={setFile} />
       <div class="row">
@@ -180,7 +180,7 @@ export function Stage() {
         if (!b) continue;
         const p = toScreen({ x: b.maxX, y: b.minY });
         hud.push(
-          <button key={`b-${item.id}`} type="button" class={`hud-badge ${st}`} style={{ left: p.x - 8, top: p.y - 6 }}
+          <button key={`b-${item.id}`} type="button" class={`hud-badge ${st}`} style={{ left: `${p.x - 8}px`, top: `${p.y - 6}px` }}
             title={`${itemLabel(item)}: ${STATUS_LABEL[st]}`} onClick={() => { select([item.id]); store.inspectorTab.value = st === 'review' ? 'sticker' : 'qa'; if (store.sheetDetent.value === 'peek') store.sheetDetent.value = 'half'; }}>
             {st === 'review' ? 'kontrol et' : st === 'printOnly' ? 'baskı' : STATUS_LABEL[st]}
           </button>,
@@ -190,13 +190,13 @@ export function Stage() {
         if (m.code !== 'UNMATCHED_REGION' || !m.region || !m.marker) continue;
         const c = toScreen({ x: m.region.x + m.region.w / 2, y: m.region.y + m.region.h / 2 });
         hud.push(
-          <button key={`m-${m.marker}`} type="button" class={`hud-marker${store.focusedMarker.value === m.marker ? ' focused' : ''}`} style={{ left: c.x, top: c.y }}
+          <button key={`m-${m.marker}`} type="button" class={`hud-marker${store.focusedMarker.value === m.marker ? ' focused' : ''}`} style={{ left: `${c.x}px`, top: `${c.y}px` }}
             aria-label={m.text} title={m.text} onClick={() => { store.focusedMarker.value = m.marker!; setMarkerPop(markerPop === m.marker ? null : m.marker!); }}>{m.marker}</button>,
         );
         if (markerPop === m.marker) {
           const stickers = [...store.files.value.values()].filter((x) => x.name !== doc.files.design && x.name !== doc.files.background);
           hud.push(
-            <div key={`p-${m.marker}`} class="hud-pop" style={{ left: c.x, top: c.y + 14 }}>
+            <div key={`p-${m.marker}`} class="hud-pop" style={{ left: `${c.x}px`, top: `${c.y + 14}px` }}>
               <span>{m.text}</span>
               <div class="row">
                 {stickers.map((s) => <button key={s.name} type="button" class="btn sm" onClick={() => { placeInRegion(m.marker!, s.name); setMarkerPop(null); }}>{s.name}</button>)}
@@ -213,7 +213,7 @@ export function Stage() {
           const b = itemBounds(item);
           if (b) {
             const p = toScreen({ x: (b.minX + b.maxX) / 2, y: b.maxY });
-            hud.push(<button key="approve" type="button" class="hud-badge ok" style={{ left: p.x, top: p.y + 26, background: 'var(--ok)', color: '#fff' }} onClick={() => approve([item.id])}>✓ Yeri doğru</button>);
+            hud.push(<button key="approve" type="button" class="hud-badge ok" style={{ left: `${p.x}px`, top: `${p.y + 26}px`, background: 'var(--ok)', color: '#fff' }} onClick={() => approve([item.id])}>✓ Yeri doğru</button>);
           }
         }
       }
@@ -223,7 +223,7 @@ export function Stage() {
   const mode = store.viewMode.value;
   return (
     <>
-      <div ref={wrap} class="stage-canvas" style={{ position: 'absolute', inset: 0 }} tabIndex={0} role="img" aria-label="Sticker sayfası tuvali">
+      <div ref={wrap} class="stage-canvas" style={{ position: 'absolute', inset: '0' }} tabIndex={0} role="img" aria-label="Sticker sayfası tuvali">
         <canvas ref={scene} class="scene" />
         <canvas ref={overlay} class="overlay" />
         <div class="hud" aria-live="polite">
@@ -233,13 +233,13 @@ export function Stage() {
         </div>
         {rulers ? <><canvas ref={rulerX} class="ruler x" /><canvas ref={rulerY} class="ruler y" /><div class="ruler corner" /></> : null}
       </div>
-      <div class="stage-top" style={{ top: rulers ? 30 : 12, left: rulers ? 30 : 12 }}>
+      <div class="stage-top" style={{ top: rulers ? '30px' : '12px', left: rulers ? '30px' : '12px' }}>
         <Segmented<ViewMode> value={mode} ariaLabel="Görünüm" onChange={(v) => { store.viewMode.value = v; }}
           options={[{ value: 'edit', label: 'Düzenle', title: '⌥1' }, { value: 'cut', label: 'Kesim sayfası', title: '⌥2' }, { value: 'print', label: 'Baskı önizleme', title: '⌥3' }]} />
         <span class="spacer" />
-        {busy.value || mode === 'edit' ? null : <span class="small muted wide-only" style={{ background: 'var(--panel)', padding: '3px 8px', borderRadius: 6 }}>{mode === 'cut' ? 'Baskıcının göreceği kesim sayfası' : 'Beyaz kenarlarla baskı sayfası'}</span>}
+        {busy.value || mode === 'edit' ? null : <span class="small muted wide-only" style={{ background: 'var(--panel)', padding: '3px 8px', borderRadius: '6px' }}>{mode === 'cut' ? 'Baskıcının göreceği kesim sayfası' : 'Beyaz kenarlarla baskı sayfası'}</span>}
       </div>
-      <div class="stage-bottom" style={{ left: rulers ? 30 : 12 }}>
+      <div class="stage-bottom" style={{ left: rulers ? '30px' : '12px' }}>
         <div class="floating" role="group" aria-label="Yakınlaştırma">
           <button type="button" class="btn quiet icon-btn" aria-label="Uzaklaştır" onClick={() => { const api = require_api(); api.zoomBy(1 / 1.25); }}><Icon name="zoomOut" /></button>
           <output class="num">{Math.round(store.camera.value.zoom * 100)}%</output>
