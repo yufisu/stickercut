@@ -5,7 +5,7 @@ import {
   type Pack, type Item, type Settings, DEFAULT_SETTINGS, effectiveSettings, mmPerDesignPx, nfc, isRegionItem, itemLabel,
 } from './project';
 import { type RoleResult, assignRoles, transparencyRatio } from './roles';
-import { type MatchOptions, matchStickers } from './match';
+import { type MatchOptions, type MatchProgress, matchStickersSteps } from './match';
 import { cloneRaster, compositeOverWhite, downscaleRaster, drawRaster, strokePolyline, createRaster } from './render';
 import { checkLayout } from './checks';
 import { regionLocation, unmatchedRegionText } from './region-label';
@@ -57,7 +57,17 @@ export function regionItemText(b: BBox, width: number, height: number, marker: n
     : `Bölge ${marker}: Sayfanın ${where} çizim tasarımdan kesildi.`;
 }
 
+export type InitProgress = MatchProgress;
+
 export function initPack(files: LoadedFile[], opts: InitOptions = {}): InitResult {
+  const steps = initPackSteps(files, opts);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
+}
+
+/** initPack'in ilerleme veren hali: eşleştirme bölge bölge ilerler (worker'da iptal edilebilir). */
+export function* initPackSteps(files: LoadedFile[], opts: InitOptions = {}): Generator<InitProgress, InitResult> {
   const byName = new Map(files.map((f) => [f.name, f]));
   const roles = assignRoles(files.map((f) => ({ file: f.name, raster: f.raster })), {
     design: opts.design && nfc(opts.design),
@@ -72,7 +82,7 @@ export function initPack(files: LoadedFile[], opts: InitOptions = {}): InitResul
   const stickerFiles = (opts.stickers?.map(nfc) ?? roles.stickers)
     .map((n) => byName.get(n))
     .filter((f): f is LoadedFile => f !== undefined);
-  const result = matchStickers(design.raster, background.raster, stickerFiles.map((f) => ({ file: f.name, raster: f.raster })), opts.match);
+  const result = yield* matchStickersSteps(design.raster, background.raster, stickerFiles.map((f) => ({ file: f.name, raster: f.raster })), opts.match);
 
   const messages: Message[] = [];
   const widthMm = opts.page?.widthMm ?? 80;
@@ -193,6 +203,16 @@ export function computeCuts(pack: Pack, assets: Map<string, Asset>, cache: CutCa
 
 /** computeCuts + öğe başına ham şekil, seçenekler ve dönüşüm (istatistik ve doğrulama için). */
 export function computeCutsDetailed(pack: Pack, assets: Map<string, Asset>, cache: CutCache = createCutCache()): CutsResult & { details: Map<string, CutDetail> } {
+  const steps = cutSteps(pack, assets, cache);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
+}
+
+export interface CutStep { itemId: string; points: Pt[]; detail: CutDetail }
+
+/** Öğe öğe kesim hesabı; her öğeden sonra sonucu verir (worker akışı ve iptal için). */
+export function* cutSteps(pack: Pack, assets: Map<string, Asset>, cache: CutCache = createCutCache()): Generator<CutStep, CutsResult & { details: Map<string, CutDetail> }> {
   const cuts = new Map<string, Pt[]>();
   const details = new Map<string, CutDetail>();
   const messages: Message[] = [];
@@ -243,15 +263,17 @@ export function computeCutsDetailed(pack: Pack, assets: Map<string, Asset>, cach
     }
     const toOrig: Affine = [1 / rasterPerOrig, 0, 0, 1 / rasterPerOrig, 0, 0];
     const m = multiply(itemMatrix(item, w, h), toOrig);
-    cuts.set(item.id, transformPoints(m, shape.points));
-    details.set(item.id, { shape, options: o, matrix: m });
+    const points = transformPoints(m, shape.points), detail: CutDetail = { shape, options: o, matrix: m };
+    cuts.set(item.id, points);
+    details.set(item.id, detail);
+    yield { itemId: item.id, points, detail };
     const c = shape.clearance;
     if (o.tightMm > 0 && c.worst && c.minMm < Math.min(o.offsetMm, o.tightMm) - 0.1) {
       const p = apply(m, c.worst), r = 2 / mm.x;
       const region: BBox = { x: Math.round(p.x - r), y: Math.round(p.y - r), w: Math.round(2 * r), h: Math.round(2 * r) };
       messages.push({ level: 'warning', code: 'TIGHT_SPOT', itemId: item.id, file: item.file ?? undefined, region,
         text: c.minMm < 0
-          ? `"${label}" kesim çizgisi çizime ${(-c.minMm).toFixed(2)} mm giriyor; ofseti artır ya da köşe yuvarlamayı azalt.`
+          ? `"${label}" kesim çizgisi çizime ${(-c.minMm).toFixed(2)} mm giriyor; ofseti artır, köşe korumayı aç ya da köşe yuvarlamayı azalt.`
           : `"${label}" kesim çizgisi çizime ${c.minMm.toFixed(2)} mm kadar yaklaşıyor (ofset ${o.offsetMm} mm).` });
     }
   }

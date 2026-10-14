@@ -28,7 +28,37 @@ async function designToScreen(page: Page, x: number, y: number, designW: number,
   return { x: box.x + ox + x * s, y: box.y + oy + y * s };
 }
 
+/** iPad (dokunmatik) projesinde paylaşım menüsü yerine navigator.share stub'ı dosyayı sayfada tutar. */
+async function stubShare(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const nav = navigator as Navigator & { __shared?: unknown };
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data: { files: File[] }) => {
+        const bytes = new Uint8Array(await data.files[0].arrayBuffer());
+        (window as unknown as { __shared: unknown }).__shared = { name: data.files[0].name, bytes: Array.from(bytes) };
+        void nav;
+      },
+    });
+  });
+}
+
+async function exportedPdf(page: Page, trigger: () => Promise<void>, touch: boolean): Promise<Uint8Array> {
+  if (!touch) {
+    const download = page.waitForEvent('download');
+    await trigger();
+    return readFileSync((await (await download).path())!);
+  }
+  await trigger();
+  await page.waitForFunction(() => (window as unknown as { __shared?: unknown }).__shared, null, { timeout: 60_000 });
+  const shared = await page.evaluate(() => (window as unknown as { __shared: { bytes: number[] } }).__shared);
+  return new Uint8Array(shared.bytes);
+}
+
 test('dosya yükle → yerleştir → sticker seç → PDF indir', async ({ page }, testInfo) => {
+  const touch = testInfo.project.name === 'ipad';
+  if (touch) await stubShare(page);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(m.text()); });
@@ -52,10 +82,8 @@ test('dosya yükle → yerleştir → sticker seç → PDF indir', async ({ page
   await page.mouse.click(p.x, p.y);
   await expect(page.getByRole('heading', { name: /Seçili sticker/ })).toBeVisible();
 
-  const download = page.waitForEvent('download');
-  await page.locator('#pdf').click();
-  const file = await (await download).path();
-  const doc = await PDFDocument.load(readFileSync(file!));
+  const bytes = await exportedPdf(page, () => page.locator('#pdf').click(), touch);
+  const doc = await PDFDocument.load(bytes);
   expect(doc.getPageCount()).toBe(2);
   expect(errors).toEqual([]);
 });

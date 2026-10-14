@@ -1,4 +1,4 @@
-import type { Raster } from '../../src/core/raster';
+import type { Raster } from '../../../src/core/raster';
 
 /** Worker içinde çalışır (OffscreenCanvas, iPadOS 16.4+). */
 export async function decodePngBytes(bytes: Uint8Array): Promise<Raster> {

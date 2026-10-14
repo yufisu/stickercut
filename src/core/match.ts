@@ -157,9 +157,12 @@ function refine(design: Raster, region: Region, st: Prepared, start: Placement):
   return { pl, score: best };
 }
 
-export function matchStickers(
+export interface MatchProgress { phase: 'regions' | 'match'; done: number; total: number }
+
+/** Bölge bölge ilerleyen eşleştirme; her bölgeden sonra ilerleme verir (iptal/ilerleme için). */
+export function* matchStickersSteps(
   design: Raster, background: Raster, stickers: StickerInput[], options: Partial<MatchOptions> = {},
-): MatchResult {
+): Generator<MatchProgress, MatchResult> {
   if (design.width !== background.width || design.height !== background.height) {
     throw new Error('Tam tasarım ve arka plan aynı boyutta olmalı.');
   }
@@ -170,7 +173,8 @@ export function matchStickers(
   const used = new Set<string>();
   const items: MatchedItem[] = [];
   const unmatchedRegions: Region[] = [];
-  for (const region of regions) {
+  yield { phase: 'regions', done: 0, total: regions.length };
+  for (const [index, region] of regions.entries()) {
     let best: { st: Prepared; pl: Placement; score: number } | null = null;
     for (const st of prepared) {
       for (const angle of ANGLES) {
@@ -180,7 +184,7 @@ export function matchStickers(
         if (!best || sc > best.score + 0.005) best = { st, pl, score: sc };
       }
     }
-    if (!best || best.score < o.rejectBelow) { unmatchedRegions.push(region); continue; }
+    if (!best || best.score < o.rejectBelow) { unmatchedRegions.push(region); yield { phase: 'match', done: index + 1, total: regions.length }; continue; }
     const { pl, score: sc } = refine(dc, region, best.st, best.pl);
     used.add(best.st.file);
     items.push({
@@ -192,6 +196,7 @@ export function matchStickers(
       score: sc,
       needsReview: sc < o.reviewBelow,
     });
+    yield { phase: 'match', done: index + 1, total: regions.length };
   }
   // Aynı sticker'ın bir renk parçası fark maskesinde ayrı ada oluşturabilir.
   // Bu ada zaten bulunan görsel tarafından açıklanıyorsa eksik PNG diye bildirme.
@@ -203,4 +208,13 @@ export function matchStickers(
     });
   });
   return { items, unusedStickers: stickers.map((s) => s.file).filter((f) => !used.has(f)), unmatchedRegions: trulyUnmatched };
+}
+
+export function matchStickers(
+  design: Raster, background: Raster, stickers: StickerInput[], options: Partial<MatchOptions> = {},
+): MatchResult {
+  const steps = matchStickersSteps(design, background, stickers, options);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
 }

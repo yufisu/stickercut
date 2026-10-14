@@ -1,0 +1,120 @@
+/* Atölye — sıcak, kâğıt ve matbaa hissi. Sayfa her temada beyaz, kesim her temada kırmızı kalır. */
+:root {
+  color-scheme: light;
+  --desk: #ebe4d6;
+  --desk-noise: .5;
+  --page: #ffffff;
+  --page-shadow: rgba(66, 48, 22, .22);
+  --panel: #faf7f1;
+  --panel-2: #f2ede3;
+  --panel-3: #e9e2d4;
+  --ink: #2a241c;
+  --ink-2: #4e4538;
+  --muted: #7f7364;
+  --line: #e1d8c7;
+  --line-strong: #cbbda4;
+  --accent: #c7412c;
+  --accent-hover: #b4381f;
+  --accent-soft: #f6dcd6;
+  --accent-ink: #fff;
+  --sel: #2d6bd0;
+  --sel-soft: #dbe6fa;
+  --warn: #c3860f;
+  --warn-soft: #f8ecc9;
+  --review: #df6c25;
+  --review-soft: #fbe2cf;
+  --ok: #4d8a5a;
+  --ok-soft: #dcecdf;
+  --err: #b9321f;
+  --err-soft: #f7d9d4;
+  --guide: #d9479f;
+  --grid: rgba(42, 36, 28, .07);
+  --grid-major: rgba(42, 36, 28, .14);
+  --ruler: #f3eee4;
+  --ruler-ink: #8a7e6e;
+  --cut: #e3261b;
+  --reference: #1c7ed6;
+  --reference-fill: rgba(28, 126, 214, .16);
+  --focus: #2d6bd0;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-lg: 16px;
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, .7), 0 1px 2px rgba(66, 48, 22, .06);
+  --shadow-float: 0 10px 30px rgba(66, 48, 22, .18), 0 2px 6px rgba(66, 48, 22, .08);
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: ui-serif, "New York", "Iowan Old Style", "Palatino", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --tap: 44px;
+  --tap-fine: 32px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --desk: #211d18;
+  --desk-noise: .35;
+  --page-shadow: rgba(0, 0, 0, .55);
+  --panel: #2a2520;
+  --panel-2: #332d27;
+  --panel-3: #3d352e;
+  --ink: #efe8dc;
+  --ink-2: #cfc5b5;
+  --muted: #a1958a;
+  --line: #3f372f;
+  --line-strong: #56493d;
+  --accent: #e4553d;
+  --accent-hover: #ef6a53;
+  --accent-soft: #4a2b25;
+  --sel: #6c9cf0;
+  --sel-soft: #26365a;
+  --warn: #e3a62c;
+  --warn-soft: #4a3a16;
+  --review: #f08a44;
+  --review-soft: #4d2f1b;
+  --ok: #78b587;
+  --ok-soft: #233f2a;
+  --err: #ef6a53;
+  --err-soft: #4a2622;
+  --grid: rgba(239, 232, 220, .08);
+  --grid-major: rgba(239, 232, 220, .16);
+  --ruler: #2a2520;
+  --ruler-ink: #a1958a;
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .3);
+  --shadow-float: 0 10px 30px rgba(0, 0, 0, .5), 0 2px 6px rgba(0, 0, 0, .3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --desk: #211d18;
+    --desk-noise: .35;
+    --page-shadow: rgba(0, 0, 0, .55);
+    --panel: #2a2520;
+    --panel-2: #332d27;
+    --panel-3: #3d352e;
+    --ink: #efe8dc;
+    --ink-2: #cfc5b5;
+    --muted: #a1958a;
+    --line: #3f372f;
+    --line-strong: #56493d;
+    --accent: #e4553d;
+    --accent-hover: #ef6a53;
+    --accent-soft: #4a2b25;
+    --sel: #6c9cf0;
+    --sel-soft: #26365a;
+    --warn: #e3a62c;
+    --warn-soft: #4a3a16;
+    --review: #f08a44;
+    --review-soft: #4d2f1b;
+    --ok: #78b587;
+    --ok-soft: #233f2a;
+    --err: #ef6a53;
+    --err-soft: #4a2622;
+    --grid: rgba(239, 232, 220, .08);
+    --grid-major: rgba(239, 232, 220, .16);
+    --ruler: #2a2520;
+    --ruler-ink: #a1958a;
+    --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow-float: 0 10px 30px rgba(0, 0, 0, .5), 0 2px 6px rgba(0, 0, 0, .3);
+  }
+}
