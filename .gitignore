@@ -9,3 +9,4 @@ playwright-report/
 *.pdf
 *.zip
 !web/public/**/*.png
+.claude/worktrees/
