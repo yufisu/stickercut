@@ -5,7 +5,8 @@ import * as storage from '../../platform/storage';
 import { parsePack, nfc, type Pack } from '../../../../src/core/project';
 import { zipToPack } from '../../../../src/core/zip';
 import type { Message } from '../../../../src/core/pipeline';
-import { runJob, toast } from './jobs';
+import { runJob, toast, type JobControl } from './jobs';
+import { isPdfFile, isPngFile, pdfPageFileName, uniqueFileName, pdfErrorText, pageSizeNotice, PDF_MAX_PAGES } from '../pdf-pages';
 import { commit, resetHistory, syncRoles, addStickerItem } from './edit';
 import { recomputeCuts, cancelCuts } from './cuts';
 import { saveFilesNow, scheduleDocSave, cancelPendingSaves, flushSaves } from './autosave';
@@ -62,16 +63,59 @@ export async function adoptFile(name: string, bytes: Uint8Array, width: number, 
   saveFilesNow();
 }
 
-/** Kurulum ekranı: PNG'leri (veya bir proje .zip'ini) ekle. */
+interface PdfPageEntry { name: string; bytes: Uint8Array; widthMm: number; heightMm: number }
+
+/**
+ * PDF'lerin çizimli sayfalarını PNG'ye çevirir (pdf.js yalnızca burada yüklenir).
+ * Kesim çizgisi ve boş sayfalar atlanır; kullanıcıya nedeni söylenir. `taken`: bu partide kullanılan adlar.
+ */
+async function pdfPageEntries(pdfs: File[], taken: Set<string>, progress: JobControl['progress'], maxArtPages = PDF_MAX_PAGES): Promise<PdfPageEntry[]> {
+  if (!pdfs.length) return [];
+  const { rasterizePdf } = await import('../../platform/pdf-raster');
+  const out: PdfPageEntry[] = [];
+  for (const f of pdfs) {
+    let pages;
+    try {
+      pages = await rasterizePdf(new Uint8Array(await f.arrayBuffer()), { maxArtPages, onProgress: (d, t) => progress('rasterize', d, t) });
+    } catch (e) {
+      toast(pdfErrorText(f.name, e), 'error');
+      continue;
+    }
+    const art = pages.filter((p) => p.png);
+    const cut = pages.filter((p) => p.kind === 'cut').length;
+    const allArt = pages.filter((p) => p.kind === 'art').length;
+    if (!art.length) {
+      toast(cut
+        ? `${f.name} yalnızca kesim çizgisi içeriyor. Çizimli sayfayı yükle; bu dosyayı editörde Kontrol sekmesinden referans olarak karşılaştırabilirsin.`
+        : `${f.name} içinde çizim bulunamadı.`, 'warning');
+      continue;
+    }
+    if (cut) toast(`${f.name}: kesim çizgisi sayfası atlandı, yalnızca çizim alındı.`);
+    if (allArt > art.length) toast(maxArtPages === 1 ? `${f.name}: ilk çizimli sayfa eklendi.` : `${f.name}: ${allArt} çizimli sayfanın ilk ${art.length} tanesi alındı.`, 'warning');
+    for (const p of art) {
+      const name = uniqueFileName(nfc(pdfPageFileName(f.name, p.page, allArt)), taken);
+      taken.add(name);
+      out.push({ name, bytes: p.png!, widthMm: p.widthMm, heightMm: p.heightMm });
+    }
+  }
+  return out;
+}
+
+/** Kurulum ekranı: PNG'leri, PDF'leri (veya bir proje .zip'ini) ekle. */
 export async function addFiles(list: File[]): Promise<void> {
   if (busy.value) return;
   const zip = list.find((f) => /\.zip$/i.test(f.name));
   if (zip) { await importZip(new Uint8Array(await zip.arrayBuffer())); return; }
-  const pngs = list.filter((f) => /\.png$/i.test(f.name) || f.type === 'image/png');
-  if (!pngs.length) { toast('PNG ya da proje .zip dosyası seç.', 'warning'); return; }
+  const pngs = list.filter(isPngFile);
+  const pdfs = list.filter(isPdfFile);
+  if (!pngs.length && !pdfs.length) { toast('PNG, PDF ya da proje .zip dosyası seç.', 'warning'); return; }
   const generic = pngs.filter((f) => /^IMG_\d+\.png$/i.test(f.name));
-  await runJob({ kind: 'addFiles', label: 'Dosyalar okunuyor', cancellable: false }, async (ctl) => {
-    const entries = await Promise.all(pngs.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
+  await runJob({ kind: 'addFiles', label: pdfs.length ? 'PDF okunuyor' : 'Dosyalar okunuyor', cancellable: false }, async (ctl) => {
+    const entries: { name: string; bytes: Uint8Array }[] = await Promise.all(pngs.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
+    // Aynı partide "washi.png" ile "washi.pdf" çakışmasın; daha önce yüklenmiş aynı ad ise yenisiyle değişir (PNG'deki gibi).
+    const fromPdf = await pdfPageEntries(pdfs, new Set(entries.map((e) => nfc(e.name))), ctl.progress);
+    entries.push(...fromPdf.map(({ name, bytes }) => ({ name, bytes })));
+    if (!entries.length) return;
     await registerFiles(entries, { signal: ctl.signal, progress: ctl.progress });
     const roles = await engine.roles();
     batch(() => {
@@ -79,6 +123,16 @@ export async function addFiles(list: File[]): Promise<void> {
       store.sheetHint.value = roles.single && roles.design && roles.sheet ? { file: roles.design, ...roles.sheet } : null;
       store.notice.value = roles.reason && !store.rolesLocked.value ? { level: 'warning', code: 'ROLES', text: roles.reason } : null;
     });
+    // PDF fiziksel ölçüyü taşır: tasarım PDF'ten geldiyse sayfa genişliği oradan alınır (yükseklik oranla gelir).
+    const design = [...store.files.value.values()].find((f) => f.role === 'design');
+    const designPage = design && fromPdf.find((p) => p.name === design.name);
+    if (designPage && !store.doc.value) {
+      const widthMm = Math.round(designPage.widthMm * 10) / 10;
+      if (Math.abs(widthMm - store.pageSetup.value.widthMm) >= 0.05 || store.pageSetup.value.heightMm !== null) {
+        store.pageSetup.value = { widthMm, heightMm: null };
+        toast(pageSizeNotice(designPage.widthMm, designPage.heightMm));
+      }
+    }
     if (generic.length) toast('Fotoğraflar\'dan gelen dosyalar yeniden adlandırılmış (IMG_…). Rolleri elle kontrol et.', 'warning');
     saveFilesNow();
     scheduleDocSave();
@@ -186,11 +240,26 @@ export async function reloadWorkerFiles(): Promise<void> {
 }
 engine.onRespawn = () => { toast('Motor yeniden başlatıldı.', 'warning'); void reloadWorkerFiles(); };
 
-/** Düzenleyiciden yeni bir PNG yükleyip sayfaya ekler. */
-export async function addNewPng(file: File, at?: { x: number; y: number }): Promise<void> {
-  await runJob({ kind: 'addFiles', label: 'PNG ekleniyor', cancellable: false }, async (ctl) => {
-    await registerFiles([{ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), role: 'sticker' }], { signal: ctl.signal, progress: ctl.progress });
-    addStickerItem(nfc(file.name), at);
+/** Düzenleyiciden yeni bir PNG ya da PDF yükleyip sayfaya ekler. PDF'in fiziksel ölçüsü korunur. */
+export async function addNewSticker(file: File, at?: { x: number; y: number }): Promise<void> {
+  const pdf = isPdfFile(file);
+  if (!pdf && !isPngFile(file)) { toast('PNG ya da PDF seç.', 'warning'); return; }
+  await runJob({ kind: 'addFiles', label: pdf ? 'PDF ekleniyor' : 'PNG ekleniyor', cancellable: false }, async (ctl) => {
+    const doc = store.doc.value;
+    // Tasarım ve arka plan dosyasının üzerine yazılmasın.
+    const reserved = new Set([doc?.files.design, doc?.files.background].filter((n): n is string => !!n));
+    let name: string, bytes: Uint8Array, widthPx: number | undefined;
+    if (pdf) {
+      const [page] = await pdfPageEntries([file], reserved, ctl.progress, 1);
+      if (!page) return;
+      ({ name, bytes } = page);
+      if (doc) widthPx = page.widthMm * (doc.designSize.widthPx / doc.page.widthMm);
+    } else {
+      name = uniqueFileName(nfc(file.name), reserved);
+      bytes = new Uint8Array(await file.arrayBuffer());
+    }
+    await registerFiles([{ name, bytes, role: 'sticker' }], { signal: ctl.signal, progress: ctl.progress });
+    addStickerItem(name, at, widthPx);
     saveFilesNow();
   });
 }

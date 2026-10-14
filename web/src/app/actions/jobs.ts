@@ -13,6 +13,7 @@ const PHASE_LABEL: Record<Phase, string> = {
   decode: 'PNG\'ler çözülüyor', roles: 'Roller belirleniyor', regions: 'Bölgeler bulunuyor', match: 'Sticker\'lar eşleştiriliyor',
   cuts: 'Kesim çizgileri', layout: 'Yerleşim kontrolü', pdf: 'PDF yazılıyor', zip: 'Paketleniyor', svg: 'SVG yazılıyor',
   png: 'PNG\'ler çiziliyor', package: 'Baskıcı paketi', reference: 'Referans okunuyor', compare: 'Karşılaştırılıyor',
+  rasterize: 'PDF sayfaları çiziliyor',
 };
 export const phaseLabel = (p: Phase | null) => (p ? PHASE_LABEL[p] : '');
 

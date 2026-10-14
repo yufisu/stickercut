@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { makeScene } from '../helpers/scene';
 import { encodePng } from '../../src/cli/png';
 
@@ -122,5 +122,47 @@ test('tek sayfa modu: yalnızca sticker sayfası → şekiller bulunur → PDF',
   const bytes = await exportedPdf(page, () => page.locator('#pdf').click(), touch);
   const doc = await PDFDocument.load(bytes);
   expect(doc.getPageCount()).toBe(2);
+  expect(errors).toEqual([]);
+});
+
+test('PDF yükle: çizimli sayfa PNG olur, kesim sayfası atlanır, sayfa ölçüsü PDF\'ten gelir', async ({ page }, testInfo) => {
+  const touch = testInfo.project.name === 'ipad';
+  if (touch) await stubShare(page);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+
+  // 90 mm genişliğinde iki sayfalık PDF: 1. sayfa sticker sayfasının görüntüsü, 2. sayfa yalnızca kırmızı kesim çizgileri.
+  const scene = makeScene();
+  const src = await PDFDocument.create();
+  const wPt = (90 / 25.4) * 72, hPt = (wPt * scene.design.height) / scene.design.width;
+  const art = src.addPage([wPt, hPt]);
+  art.drawImage(await src.embedPng(encodePng(scene.design)), { x: 0, y: 0, width: wPt, height: hPt });
+  const cut = src.addPage([wPt, hPt]);
+  for (const [x, y] of [[60, 80], [180, 90], [90, 220], [190, 230]]) cut.drawCircle({ x, y, size: 40, borderColor: rgb(0.9, 0.1, 0.15), borderWidth: 1 });
+  const dir = testInfo.outputPath('pdf');
+  mkdirSync(dir, { recursive: true });
+  const pdfPath = join(dir, 'sayfa.pdf');
+  writeFileSync(pdfPath, await src.save());
+
+  await page.goto('/');
+  await page.locator('#picker').setInputFiles([pdfPath]);
+  await expect(page.locator('.file-card')).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.locator('.file-card.design .name')).toHaveText('sayfa.png');
+  await expect(page.getByLabel('Sayfa genişliği (mm)')).toHaveValue('90');
+  await expect(page.locator('.single-sheet')).toContainText('Tek sayfa modu');
+  await expect(page.locator('#place')).toBeEnabled();
+
+  await page.locator('#place').click();
+  await expect(page.locator('.editor')).toBeVisible();
+  if (touch) await page.getByRole('button', { name: 'Katmanlar' }).click();
+  await expect(page.locator('.layer')).toHaveCount(4);
+  await expect(page.locator('.layer .badge.ok')).toHaveCount(4, { timeout: 60_000 });
+  if (touch) await page.locator('.scrim').click();
+
+  const bytes = await exportedPdf(page, () => page.locator('#pdf').click(), touch);
+  const out = await PDFDocument.load(bytes);
+  expect(out.getPageCount()).toBe(2);
+  expect(out.getPage(0).getWidth()).toBeCloseTo(wPt, 0);
   expect(errors).toEqual([]);
 });

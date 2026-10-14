@@ -16,6 +16,8 @@ Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden, Ill
 
 **PNG'si olmayan çizimler:** Tasarımda olup sticker PNG'si verilmeyen her çizim, tasarımın kendisinden kesilen bir *bölge öğesi* olur. Yalnızca tam tasarım + arka plan ile de çalışır.
 
+**PDF girdisi (web):** PNG yerine PDF ya da PDF uyumlu kaydedilmiş Illustrator `.ai` dosyası da bırakılabilir. Her çizimli sayfa 500 dpi PNG'ye çevrilir (8 MP üstü tabakalarda çözünürlük düşer); zemini olmayan sayfa şeffaf kalır. Yalnızca kesim çizgisi olan sayfalar (ör. `kahve pack.pdf`'in 2. sayfası, `… kesim.pdf`) ve boş sayfalar atlanır. Tam tasarım PDF'ten geldiyse sayfa genişliği PDF'in ölçüsünden alınır. Editörde *Yeni dosya* ile eklenen sticker PDF'i fiziksel ölçüsüyle yerleşir. pdf.js yalnızca PDF bırakılınca yüklenir. CLI PDF okumaz; orada PNG kullan.
+
 **Tek sayfa modu:** Yalnızca sticker sayfası yüklenirse arka plan sayfanın kendisinden çıkarılır. Baskın düz renk ya da şeffaf alanlar arka plan sayılır, ondan ayrışan her ada bir şekil olur. Sticker'sız arka plan, şekillerin yeri çevre rengiyle doldurularak üretilir; böylece baskı sayfası yüklenen sayfanın birebir aynısı kalır, küçük süsler ve yazılar yerinde durur. Sayfa kenarına dayanan alanlar (başlık bandı, çerçeve, köşe süsü) kesilmez. Başlık ve yazılar da şekil sayılabilir; kesilmesin istediklerini katman listesinde makasla "sadece baskı" yap (silme: silinen şekil baskıdan da kalkar). Arka plan desenli, ızgaralı ya da resimliyse şekiller ayrılamaz; uygulama bunu söyler ve sticker'sız arka planı istemeyi önerir.
 
 ## CLI

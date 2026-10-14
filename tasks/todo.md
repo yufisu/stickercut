@@ -61,6 +61,18 @@ Amaç: Kullanıcı yalnızca sticker dolu sayfayı (tek opak ya da şeffaf PNG) 
 - `TIGHT_SPOT` eşiği kaynak çözünürlüğüne göre (≥ 4 kaynak pikseli): düşük çözünürlüklü sayfa bölgelerinde gürültü uyarıları kalktı.
 - Gerçek sayfalar: kahve, örgü, sinema, cinephile, çay çalışıyor; saiki uyarı; ızgaralı kedi sayfası anlaşılır hata.
 
+## PDF girdisi (14 Ekim 2026, tamamlandı)
+
+Amaç: Kurulumda ve editörde PNG gibi PDF (ve PDF uyumlu `.ai`) yüklenebilsin.
+
+- [x] Gerçek PDF'leri ölç: 50 dpi çizimde kesim sayfalarında boyalı piksellerin iç oranı %0, çizimli sayfalarda ≥ %79 → `classifyPage` (kesim / boş / çizim)
+- [x] `web/src/app/pdf-pages.ts` saf yardımcılar (ölçek, sınıflama, adlar, hata metinleri) + `tests/web/pdf-pages.test.ts`
+- [x] `web/src/platform/pdf-raster.ts`: pdfjs-dist eski tarayıcı derlemesi, tembel import, şeffaf zemin (`canvas: null` + kendi alfa bağlamı), 500 dpi / 8 MP sınırı, `toBlob` PNG
+- [x] `addFiles`: PDF sayfaları PNG olarak eklenir, kesim/boş sayfa atlanır ve söylenir, tasarım PDF'ten geldiyse sayfa genişliği alınır; aynı partide ad çakışması `ad (2).png`
+- [x] Editör *Yeni dosya*: PDF sticker fiziksel ölçüsüyle yerleşir; tasarım/arka plan dosyasının üzerine yazılmaz (PNG için de)
+- [x] Testler: actions (4 yeni), e2e Chromium + iPad WebKit (iki sayfalı PDF → tek sayfa modu → PDF)
+- [x] Gerçek PDF'ler tarayıcıda: kahve (17 şekil), aero (22), cinefil 1 (48/48 hazır), ginger (12), seal 30 mm (1); `kahve pack.ai` açılıyor; `aero pack kesim.pdf` anlaşılır uyarı. Okuma ≈ 1 s, yerleştirme 2–3.5 s. WebKit'te kahve aynı sonuç.
+
 ## Gözden geçirme (14 Ekim 2026)
 - Motor: 13/13 kahve kesimi G1, 6–12 anchor, düz segment yok, çizime giriş ≤ 0.09 mm; sticker başına 80–520 ms (Mac, node).
 - Araçlar: bölge öğeleri (PNG'siz), compare/doctor, OCG katmanlı/spot renkli PDF, SVG, sticker PNG zip, baskıcı paketi.

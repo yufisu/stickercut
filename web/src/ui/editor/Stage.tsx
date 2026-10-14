@@ -3,7 +3,7 @@ import type { JSX } from 'preact';
 import { effect } from '@preact/signals';
 import { store, itemStatus, messages, busy, type ViewMode } from '../../app/store';
 import { select, addStickerItem, itemBounds, approve, dismissMarker, placeInRegion } from '../../app/actions/edit';
-import { addNewPng } from '../../app/actions/files';
+import { addNewSticker } from '../../app/actions/files';
 import { registerEditorApi } from '../../app/editor-api';
 import { STATUS_LABEL } from '../../app/status';
 import { readPalette } from '../../platform/theme';
@@ -27,8 +27,8 @@ function AddPopover({ at, screen, onClose }: { at: Coord; screen: Coord; onClose
       <b>Buraya sticker ekle</b>
       {stickers.length ? <div class="row">{stickers.map((f) => <button key={f.name} type="button" class="btn sm" onClick={() => { addStickerItem(f.name, at); onClose(); }}>{f.name}</button>)}</div> : <p class="muted small">Yüklü sticker yok.</p>}
       <div class="row">
-        <input ref={pick} type="file" accept=".png,.PNG,image/png" hidden onChange={() => { const f = pick.current?.files?.[0]; if (pick.current) pick.current.value = ''; if (f) { void addNewPng(f, at); onClose(); } }} />
-        <button type="button" class="btn sm" onClick={() => pick.current?.click()}><Icon name="plus" size={14} /> Yeni PNG yükle</button>
+        <input ref={pick} type="file" accept=".png,.PNG,image/png,.pdf,application/pdf,.ai" hidden onChange={() => { const f = pick.current?.files?.[0]; if (pick.current) pick.current.value = ''; if (f) { void addNewSticker(f, at); onClose(); } }} />
+        <button type="button" class="btn sm" onClick={() => pick.current?.click()}><Icon name="plus" size={14} /> PNG ya da PDF yükle</button>
         <button type="button" class="btn sm quiet" onClick={onClose}>Kapat</button>
       </div>
     </div>

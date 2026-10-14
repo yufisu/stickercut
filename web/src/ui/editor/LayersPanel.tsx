@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { store, itemStatus, busy } from '../../app/store';
 import { select, reorder, setItemFields, itemBounds, addStickerItem } from '../../app/actions/edit';
-import { addNewPng } from '../../app/actions/files';
+import { addNewSticker } from '../../app/actions/files';
 import { editorApi } from '../../app/editor-api';
 import { STATUS_LABEL } from '../../app/status';
 import { itemLabel, mmPerDesignPx, isRegionItem, type Item } from '../../../../src/core/project';
@@ -68,8 +68,8 @@ export function AddStickerControl() {
     <div class="row" style={{ display: 'flex', gap: '6px' }}>
       <Select class="sm" value={file} options={options} ariaLabel="Eklenecek sticker" onChange={setFile} />
       <button type="button" class="btn sm" disabled={!file || busy.value} onClick={() => { if (file) addStickerItem(file); }}>Ekle</button>
-      <input ref={pick} type="file" accept=".png,.PNG,image/png" hidden onChange={() => { const f = pick.current?.files?.[0]; if (pick.current) pick.current.value = ''; if (f) void addNewPng(f); }} />
-      <button type="button" class="btn sm" disabled={busy.value} onClick={() => pick.current?.click()} title="Yeni PNG yükle ve ekle"><Icon name="plus" size={14} /> Yeni PNG</button>
+      <input ref={pick} type="file" accept=".png,.PNG,image/png,.pdf,application/pdf,.ai" hidden onChange={() => { const f = pick.current?.files?.[0]; if (pick.current) pick.current.value = ''; if (f) void addNewSticker(f); }} />
+      <button type="button" class="btn sm" disabled={busy.value} onClick={() => pick.current?.click()} title="Yeni PNG ya da PDF yükle ve ekle"><Icon name="plus" size={14} /> Yeni dosya</button>
     </div>
   );
 }

@@ -21,10 +21,13 @@ vi.mock('../../web/src/platform/storage', () => ({
   savePrefs: vi.fn(),
 }));
 
+vi.mock('../../web/src/platform/pdf-raster', () => ({ rasterizePdf: vi.fn() }));
+
 import { engine } from '../../web/src/engine/engine';
+import { rasterizePdf } from '../../web/src/platform/pdf-raster';
 import * as storage from '../../web/src/platform/storage';
 import { store, busy } from '../../web/src/app/store';
-import { addFiles, removeFile, setRole, newProject, restore } from '../../web/src/app/actions/files';
+import { addFiles, addNewSticker, removeFile, setRole, newProject, restore } from '../../web/src/app/actions/files';
 import { place } from '../../web/src/app/actions/placement';
 import { flushSaves } from '../../web/src/app/actions/autosave';
 import type { FileEntry, Role } from '../../web/src/app/store';
@@ -128,6 +131,58 @@ describe('dosya aksiyonları', () => {
     expect(store.files.value.get('sayfa.png')!.role).toBe('design');
     expect(store.sheetHint.value).toMatchObject({ file: 'sayfa.png', kind: 'flat', rgb: [200, 220, 140] });
     expect(store.notice.value).toBeNull();
+  });
+
+  it('addFiles PDF’in çizimli sayfasını PNG olarak ekler, kesim sayfasını atlar ve sayfa ölçüsünü alır', async () => {
+    store.files.value = new Map();
+    store.toasts.value = [];
+    vi.mocked(rasterizePdf).mockResolvedValueOnce([
+      { page: 1, kind: 'art', widthMm: 90.01, heightMm: 130, png: new Uint8Array([7, 7]) },
+      { page: 2, kind: 'cut', widthMm: 90.01, heightMm: 130, png: null },
+    ]);
+    vi.mocked(engine.roles).mockResolvedValueOnce({ design: 'sayfa.png', background: null, stickers: [], ambiguous: false, single: true });
+    await addFiles([file('sayfa.pdf')]);
+    expect(engine.addFiles).toHaveBeenCalledWith([{ name: 'sayfa.png', bytes: new Uint8Array([7, 7]) }], expect.anything());
+    expect(store.files.value.get('sayfa.png')!.role).toBe('design');
+    expect(store.pageSetup.value).toEqual({ widthMm: 90, heightMm: null });
+    const texts = store.toasts.value.map((t) => t.text);
+    expect(texts).toContain('sayfa.pdf: kesim çizgisi sayfası atlandı, yalnızca çizim alındı.');
+    expect(texts).toContain('Sayfa ölçüsü PDF\'ten alındı: 90 × 130 mm.');
+  });
+
+  it('addFiles yalnızca kesim çizgisi olan PDF’i eklemez ve nedenini söyler; bozuk PDF hata verir', async () => {
+    store.files.value = new Map();
+    store.toasts.value = [];
+    vi.mocked(rasterizePdf).mockResolvedValueOnce([{ page: 1, kind: 'cut', widthMm: 80, heightMm: 140, png: null }]);
+    await addFiles([file('kahve kesim.pdf')]);
+    expect(engine.addFiles).not.toHaveBeenCalled();
+    expect(store.toasts.value.at(-1)).toMatchObject({ kind: 'warning', text: expect.stringContaining('yalnızca kesim çizgisi') });
+    vi.mocked(rasterizePdf).mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'InvalidPDFException' }));
+    await addFiles([file('eski.ai')]);
+    expect(store.toasts.value.at(-1)).toMatchObject({ kind: 'error', text: expect.stringContaining('PDF uyumlu') });
+    expect(busy.value).toBe(false);
+  });
+
+  it('addFiles aynı partideki PNG ile PDF adını çakıştırmaz', async () => {
+    store.files.value = new Map();
+    vi.mocked(rasterizePdf).mockResolvedValueOnce([{ page: 1, kind: 'art', widthMm: 80, heightMm: 140, png: new Uint8Array([5]) }]);
+    vi.mocked(engine.roles).mockResolvedValueOnce({ design: 'washi.png', background: 'washi (2).png', stickers: [], ambiguous: false });
+    await addFiles([file('washi.png'), file('washi.pdf')]);
+    expect([...store.files.value.keys()]).toEqual(['washi.png', 'washi (2).png']);
+  });
+
+  it('addNewSticker PDF’i fiziksel ölçüsüyle yerleştirir ve tasarım dosyasının üzerine yazmaz', async () => {
+    store.doc.value = {
+      version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 800, heightPx: 800 },
+      files: { design: 'design.png', background: 'background.png' }, defaults: {} as never, items: [],
+    } as unknown as NonNullable<typeof store.doc.value>;
+    vi.mocked(rasterizePdf).mockResolvedValueOnce([{ page: 1, kind: 'art', widthMm: 30, heightMm: 30, png: new Uint8Array([3]) }]);
+    await addNewSticker(file('design.pdf'));
+    expect(vi.mocked(rasterizePdf).mock.calls.at(-1)![1]).toMatchObject({ maxArtPages: 1 });
+    const item = store.doc.value!.items.at(-1)!;
+    expect(item.file).toBe('design (2).png');
+    expect(item.scale * 100).toBeCloseTo(300, 6); // 30 mm × 10 px/mm, dosya 100 px
+    expect(store.files.value.get('design.png')!.role).toBe('design');
   });
 
   it('newProject bekleyen kaydı bitirir, depoyu temizler ve mağazayı sıfırlar', async () => {

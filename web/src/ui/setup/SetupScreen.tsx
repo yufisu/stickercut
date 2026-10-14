@@ -24,14 +24,14 @@ function DropZone() {
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); if (!disabled && e.dataTransfer?.files.length) void addFiles([...e.dataTransfer.files]); }}
     >
-      <input ref={files} type="file" multiple accept=".png,.PNG,image/png,.zip,application/zip" hidden onChange={() => pick(files.current)} id="picker" />
+      <input ref={files} type="file" multiple accept=".png,.PNG,image/png,.pdf,.PDF,application/pdf,.ai,.zip,application/zip" hidden onChange={() => pick(files.current)} id="picker" />
       <input ref={photos} type="file" multiple accept="image/png" hidden onChange={() => pick(photos.current)} />
       <div class="big">Sticker sayfanı bırak</div>
       <div class="row">
         <button type="button" class="btn" disabled={disabled} onClick={() => files.current?.click()}><Icon name="folder" /> Dosyalar'dan seç</button>
         <button type="button" class="btn" disabled={disabled} onClick={() => photos.current?.click()}><Icon name="photo" /> Fotoğraflar'dan</button>
       </div>
-      <p class="hint">Tek bir sayfa yeter: arka planı düz renk ya da şeffafsa sticker'lar sayfadan bulunur. Varsa sticker'sız arka planı ve tek tek sticker PNG'lerini de ekle; sonuç daha kesin olur. Proje .zip'i de açılır. Dosyalar cihazından çıkmaz.</p>
+      <p class="hint">Tek bir sayfa yeter, PNG ya da PDF olabilir: arka planı düz renk ya da şeffafsa sticker'lar sayfadan bulunur. PDF'in ölçüsü sayfa ölçüsü olarak alınır, kesim çizgisi sayfaları atlanır. Varsa sticker'sız arka planı ve tek tek sticker PNG'lerini de ekle; sonuç daha kesin olur. Proje .zip'i de açılır. Dosyalar cihazından çıkmaz.</p>
     </div>
   );
 }

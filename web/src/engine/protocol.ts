@@ -6,7 +6,7 @@ import type { CompareResult } from '../../../src/core/compare';
 
 export type JobId = number;
 export type Phase =
-  | 'decode' | 'roles' | 'regions' | 'match' | 'cuts' | 'layout' | 'pdf' | 'zip' | 'svg' | 'png' | 'package' | 'reference' | 'compare';
+  | 'decode' | 'roles' | 'regions' | 'match' | 'cuts' | 'layout' | 'pdf' | 'zip' | 'svg' | 'png' | 'package' | 'reference' | 'compare' | 'rasterize';
 
 export interface ExportOptions extends BuildPdfOptions { pngDpi?: number; mockups?: boolean; printSvg?: boolean }
 
