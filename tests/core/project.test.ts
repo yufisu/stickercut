@@ -65,4 +65,28 @@ describe('project', () => {
     const p = parsePack(JSON.stringify(minimal));
     expect(nextItemId(p)).toBe('i2');
   });
+
+  it('v1 smoothing ayarını smoothMm’ye taşır, bilinmeyen alanları atar, sürümü 2 yapar', () => {
+    const v1 = { ...minimal, defaults: { smoothing: 0.5, offsetMm: 1, junk: 3 }, items: [{ ...minimal.items[0], overrides: { smoothing: 1, simplifyMm: 0.1 } }] };
+    const p = parsePack(JSON.stringify(v1));
+    expect(p.version).toBe(2);
+    expect(p.defaults.smoothMm).toBe(0.2);
+    expect(p.defaults.offsetMm).toBe(1);
+    expect(p.defaults.closingMm).toBe(DEFAULT_SETTINGS.closingMm);
+    expect((p.defaults as unknown as Record<string, unknown>).junk).toBeUndefined();
+    expect(p.items[0].overrides).toEqual({ smoothMm: 0.4, simplifyMm: 0.1 });
+    expect(JSON.parse(serializePack(p)).version).toBe(2);
+  });
+
+  it('bölge öğesi: file null + geçerli region kabul edilir, bozuk rle reddedilir', () => {
+    const region = { bbox: { x: 10, y: 20, w: 3, h: 2 }, rle: '1,4,1' };
+    const p = parsePack(JSON.stringify({ ...minimal, items: [{ id: 'r1', file: null, region, x: 11.5, y: 21, scale: 1 }] }));
+    expect(p.items[0].file).toBeNull();
+    expect(p.items[0].region).toEqual(region);
+    expect(parsePack(serializePack(p)).items[0]).toEqual(p.items[0]);
+    const bad = { ...minimal, items: [{ id: 'r1', file: null, region: { ...region, rle: '1,4' }, x: 1, y: 1, scale: 1 }] };
+    expect(() => parsePack(JSON.stringify(bad))).toThrow(/uyuşmuyor/);
+    const none = { ...minimal, items: [{ id: 'r1', file: null, x: 1, y: 1, scale: 1 }] };
+    expect(() => parsePack(JSON.stringify(none))).toThrow(/region/);
+  });
 });

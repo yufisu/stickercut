@@ -41,7 +41,7 @@ async function handle(req: Request): Promise<unknown> {
       return buildPackPdf(parsePack(req.packJson), files, cache);
     case 'zip': {
       const pack = parsePack(req.packJson);
-      const names = new Set([pack.files.design, pack.files.background, ...pack.items.map((i) => i.file)]);
+      const names = new Set([pack.files.design, pack.files.background, ...pack.items.map((i) => i.file).filter((f): f is string => f !== null)]);
       return packToZip(req.packJson, new Map([...names].filter((n) => files.has(n)).map((n) => [n, files.get(n)!.bytes])));
     }
     case 'reset':

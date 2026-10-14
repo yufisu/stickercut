@@ -1,6 +1,14 @@
 import { state } from '../state';
 import { itemMatrix, closedPathSvg, pointInPolygon, type Pt } from '../../../src/core/geometry';
-import { effectiveSettings, type Item } from '../../../src/core/project';
+import { effectiveSettings, isRegionItem, type Item, type RegionSource } from '../../../src/core/project';
+import { regionOutline } from '../../../src/core/contour';
+
+const outlineCache = new WeakMap<RegionSource, Path2D>();
+function regionClip(region: RegionSource): Path2D {
+  let p = outlineCache.get(region);
+  if (!p) { p = new Path2D(closedPathSvg(regionOutline(region))); outlineCache.set(region, p); }
+  return p;
+}
 import { corners, containsPoint, handles, hitHandle, moved, scaled, rotated, type Geom } from './interaction';
 
 type Mode = 'move' | 'scale' | 'rotate';
@@ -73,7 +81,8 @@ export class CanvasView {
   }
 
   private geom(item: Item): Geom | null {
-    const f = state.files.get(item.file);
+    if (isRegionItem(item)) return { x: item.x, y: item.y, scale: item.scale, rotationDeg: item.rotationDeg, w: item.region.bbox.w, h: item.region.bbox.h };
+    const f = item.file === null ? undefined : state.files.get(item.file);
     return f ? { x: item.x, y: item.y, scale: item.scale, rotationDeg: item.rotationDeg, w: f.width, h: f.height } : null;
   }
 
@@ -111,8 +120,19 @@ export class CanvasView {
         g.fill(new Path2D(closedPathSvg(cut)));
       }
     }
+    const design = state.files.get(pack.files.design);
     for (const item of pack.items) {
-      const f = state.files.get(item.file);
+      if (isRegionItem(item)) {
+        if (!design) continue;
+        const { bbox } = item.region;
+        g.save();
+        g.transform(...itemMatrix(item, bbox.w, bbox.h));
+        g.clip(regionClip(item.region));
+        g.drawImage(design.bitmap, -bbox.x, -bbox.y, dw, dh);
+        g.restore();
+        continue;
+      }
+      const f = item.file === null ? undefined : state.files.get(item.file);
       if (!f) continue;
       g.save();
       g.transform(...itemMatrix(item, f.width, f.height));

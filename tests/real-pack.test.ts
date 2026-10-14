@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 import { run, type Io } from '../src/cli/run';
+import { parsePack } from '../src/core/project';
+import { computeCutsDetailed, packAssetNames, type LoadedFile } from '../src/core/pipeline';
+import { loadFile, resolveOnDisk } from '../src/cli/files';
+import { isG1 } from '../src/core/spline';
 
 const root = process.env.STICKERS_DIR;
 
@@ -36,5 +40,21 @@ describe.skipIf(!root)('gerçek pack: Türk kahvesi', () => {
     const doc = await PDFDocument.load(readFileSync(join(out, 'kahve.pack.pdf')));
     expect(doc.getPageCount()).toBe(2);
     console.log('çıktı klasörü:', out);
+
+    // Kesim kalitesi: tamamen kübik, G1, makul anchor sayısı, çizime girmiyor.
+    const parsed = parsePack(readFileSync(packPath, 'utf8'));
+    const assets = new Map<string, LoadedFile>(packAssetNames(parsed, true).map((n) => [n, loadFile(resolveOnDisk(dirname(packPath), n), n)]));
+    const { cuts, details } = computeCutsDetailed(parsed, assets);
+    const rows: string[] = [];
+    for (const item of parsed.items) {
+      const d = details.get(item.id)!, pts = cuts.get(item.id)!;
+      rows.push(`${item.id} anchors=${d.shape.stats.anchors} lines=${d.shape.stats.lines} G1=${isG1(pts)} min=${d.shape.clearance.minMm.toFixed(2)}mm ms=${d.shape.stats.ms.toFixed(0)}`);
+      expect(d.shape.stats.lines, item.id).toBe(0);
+      expect(isG1(pts), item.id).toBe(true);
+      expect(d.shape.stats.anchors, item.id).toBeGreaterThanOrEqual(6);
+      expect(d.shape.stats.anchors, item.id).toBeLessThanOrEqual(150);
+      expect(d.shape.clearance.minMm, item.id).toBeGreaterThanOrEqual(d.options.offsetMm - 0.1);
+    }
+    console.log(rows.join('\n'));
   });
 });

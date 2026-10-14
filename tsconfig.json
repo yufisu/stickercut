@@ -9,7 +9,9 @@
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   },
-  "include": ["src", "web", "tests", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "web", "tests", "scripts", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

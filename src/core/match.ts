@@ -12,7 +12,7 @@ export const DEFAULT_MATCH_OPTIONS: MatchOptions = { diffThreshold: 48, minAreaR
 export interface StickerInput { file: string; raster: Raster }
 /** scale: tasarım px / raster px */
 export interface MatchedItem { file: string; x: number; y: number; scale: number; rotationDeg: number; score: number; needsReview: boolean }
-export interface MatchResult { items: MatchedItem[]; unusedStickers: string[]; unmatchedRegions: BBox[] }
+export interface MatchResult { items: MatchedItem[]; unusedStickers: string[]; unmatchedRegions: Region[] }
 export interface Region { bbox: BBox; mask: Mask }
 
 interface Prepared { file: string; raster: Raster; outline: Pt[] }
@@ -169,7 +169,7 @@ export function matchStickers(
   const prepared = stickers.map(prepareSticker).filter((p): p is Prepared => p !== null);
   const used = new Set<string>();
   const items: MatchedItem[] = [];
-  const unmatchedRegions: BBox[] = [];
+  const unmatchedRegions: Region[] = [];
   for (const region of regions) {
     let best: { st: Prepared; pl: Placement; score: number } | null = null;
     for (const st of prepared) {
@@ -180,7 +180,7 @@ export function matchStickers(
         if (!best || sc > best.score + 0.005) best = { st, pl, score: sc };
       }
     }
-    if (!best || best.score < o.rejectBelow) { unmatchedRegions.push(region.bbox); continue; }
+    if (!best || best.score < o.rejectBelow) { unmatchedRegions.push(region); continue; }
     const { pl, score: sc } = refine(dc, region, best.st, best.pl);
     used.add(best.st.file);
     items.push({
@@ -195,8 +195,7 @@ export function matchStickers(
   }
   // Aynı sticker'ın bir renk parçası fark maskesinde ayrı ada oluşturabilir.
   // Bu ada zaten bulunan görsel tarafından açıklanıyorsa eksik PNG diye bildirme.
-  const trulyUnmatched = unmatchedRegions.filter((bbox) => {
-    const region = regions.find((r) => r.bbox === bbox)!;
+  const trulyUnmatched = unmatchedRegions.filter((region) => {
     return !items.some((item) => {
       const st = prepared.find((p) => p.file === item.file)!;
       const pl = { s: item.scale, cx: item.x, cy: item.y, angle: item.rotationDeg * Math.PI / 180 };

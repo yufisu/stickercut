@@ -1,8 +1,10 @@
 import {
-  PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, type PDFImage,
+  PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, moveTo, lineTo, closePath, clip, endPath,
+  type PDFImage, type PDFPage,
 } from 'pdf-lib';
-import { type Pack, PT_PER_MM, effectiveSettings } from './project';
+import { type Pack, type RegionItem, PT_PER_MM, effectiveSettings, isRegionItem } from './project';
 import { type Affine, type Pt, multiply, itemMatrix, transformPoints, closedPathSvg } from './geometry';
+import { regionOutline } from './contour';
 
 export interface PdfAsset { bytes: Uint8Array; width: number; height: number }
 export interface BuildPdfInput { pack: Pack; assets: Map<string, PdfAsset>; cuts: Map<string, Pt[]> }
@@ -38,6 +40,11 @@ export async function buildPdf({ pack, assets, cuts }: BuildPdfInput): Promise<U
     if (cut && !item.printOnly && effectiveSettings(pack, item).whiteBorder) {
       print.drawSvgPath(closedPathSvg(transformPoints(toPt, cut)), { x: 0, y: H, color: rgb(1, 1, 1) });
     }
+    if (isRegionItem(item)) {
+      drawRegionItem(print, item, asset(pack.files.design), print.node.newXObject('Image', (await image(pack.files.design)).ref), toPdf);
+      continue;
+    }
+    if (item.file === null) continue;
     const a = asset(item.file);
     const unitToSticker: Affine = [a.width, 0, 0, -a.height, 0, a.height];
     const m = multiply(toPdf, multiply(itemMatrix(item, a.width, a.height), unitToSticker));
@@ -55,4 +62,21 @@ export async function buildPdf({ pack, assets, cuts }: BuildPdfInput): Promise<U
     });
   }
   return doc.save();
+}
+
+/** Bölge öğesi: tasarım görselini bölge dış hattıyla kırparak öğe dönüşümüyle çizer. */
+function drawRegionItem(page: PDFPage, item: RegionItem, design: PdfAsset, image: ReturnType<PDFPage['node']['newXObject']>, toPdf: Affine): void {
+  const { bbox } = item.region;
+  const local = multiply(toPdf, itemMatrix(item, bbox.w, bbox.h)); // bbox-yerel px → PDF pt
+  const outline = transformPoints(local, regionOutline(item.region));
+  if (outline.length < 3) return;
+  const unitToLocal: Affine = [design.width, 0, 0, -design.height, -bbox.x, -bbox.y + design.height];
+  const m = multiply(local, unitToLocal);
+  page.pushOperators(
+    pushGraphicsState(),
+    moveTo(outline[0].x, outline[0].y),
+    ...outline.slice(1).map((p) => lineTo(p.x, p.y)),
+    closePath(), clip(), endPath(),
+    concatTransformationMatrix(...m), drawObject(image), popGraphicsState(),
+  );
 }

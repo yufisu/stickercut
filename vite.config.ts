@@ -5,4 +5,5 @@ export default defineConfig({
   base: './',
   build: { outDir: '../dist', emptyOutDir: true },
   worker: { format: 'es' },
+  oxc: { jsx: { runtime: 'automatic', importSource: 'preact' } },
 });

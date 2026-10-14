@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { initPack, computeCuts, prepareLoadedFile, renderPackPreview, type LoadedFile } from '../../src/core/pipeline';
 import { checkLayout } from '../../src/core/checks';
 import { createRaster } from '../../src/core/render';
+import { polygonBounds } from '../../src/core/geometry';
 import { makeScene, paint } from '../helpers/scene';
 
 const EMPTY = new Uint8Array(0);
@@ -47,18 +48,58 @@ describe('initPack', () => {
     expect(res.messages.find((m) => m.code === 'REUSED_STICKER')?.text).toContain('2 ayrı kesim çizgisi');
   });
 
-  it('eksik çizimi koordinat yerine numaralı bölge olarak bildirir', () => {
+  it('bölge öğeleri kapalıyken eksik çizimi numaralı bölge olarak bildirir', () => {
     const s = makeScene([{ file: 'baklava.png', x: 220, y: 880, scale: 0.5 }]);
     const files = [
       prepareLoadedFile('tasarim.png', EMPTY, s.design),
       prepareLoadedFile('arka.png', EMPTY, s.background),
     ];
-    const res = initPack(files, { page: { widthMm: 80 } });
+    const res = initPack(files, { page: { widthMm: 80 }, regionItems: false });
     const region = res.messages.find((m) => m.code === 'UNMATCHED_REGION');
+    expect(res.pack!.items).toHaveLength(0);
     expect(region?.region).toBeDefined();
     expect(region?.marker).toBe(1);
     expect(region?.text).toContain('turuncu 1 işaretine');
     expect(region?.text).not.toContain('x=');
+  });
+
+  it('PNG verilmeyen çizimi tasarımdan bölge öğesi yapar ve kesim üretir (sticker varsa kontrol ister)', () => {
+    const s = makeScene([{ file: 'baklava.png', x: 220, y: 880, scale: 0.5 }, { file: 'cay.png', x: 560, y: 300, scale: 0.5 }]);
+    const files = [
+      prepareLoadedFile('tasarim.png', EMPTY, s.design),
+      prepareLoadedFile('arka.png', EMPTY, s.background),
+      prepareLoadedFile('cay.png', EMPTY, s.stickers.find((st) => st.file === 'cay.png')!.raster),
+    ];
+    const res = initPack(files, { page: { widthMm: 80 } });
+    const region = res.pack!.items.find((i) => i.file === null)!;
+    expect(region).toBeDefined();
+    expect(region.region!.bbox.w).toBeGreaterThan(140);
+    expect(region.region!.bbox.w).toBeLessThan(160);
+    expect(region.region!.bbox.h).toBeGreaterThan(110);
+    expect(region.needsReview).toBe(true);
+    expect(Math.abs(region.x - 220)).toBeLessThan(4);
+    expect(Math.abs(region.y - 880)).toBeLessThan(4);
+    const msg = res.messages.find((m) => m.code === 'REGION_ITEM')!;
+    expect(msg.level).toBe('warning');
+    expect(msg.itemId).toBe(region.id);
+    expect(res.messages.some((m) => m.code === 'UNMATCHED_REGION')).toBe(false);
+    const { cuts, messages } = computeCuts(res.pack!, assetsOf(files));
+    expect(messages.filter((m) => m.level === 'error')).toEqual([]);
+    const b = polygonBounds(cuts.get(region.id)!);
+    expect(b.minX).toBeGreaterThan(region.region!.bbox.x - 8);
+    expect(b.maxX).toBeLessThan(region.region!.bbox.x + region.region!.bbox.w + 8);
+  });
+
+  it('yalnızca tasarım + arka plan ile her bölge bilgi düzeyinde öğe olur', () => {
+    const files = sceneFiles().slice(0, 2);
+    const res = initPack(files, { page: { widthMm: 80 } });
+    expect(res.pack!.items).toHaveLength(4);
+    expect(res.pack!.items.every((i) => i.file === null && !i.needsReview)).toBe(true);
+    expect(res.messages.filter((m) => m.code === 'REGION_ITEM').every((m) => m.level === 'info')).toBe(true);
+    const { cuts } = computeCuts(res.pack!, assetsOf(files));
+    expect(cuts.size).toBe(4);
+    const preview = renderPackPreview(res.pack!, assetsOf(files), cuts);
+    expect([preview.width, preview.height]).toEqual([800, 1200]);
   });
 
   it('sahneden 4 öğeli paket kurar, kullanılmayanı bildirir', () => {
@@ -139,10 +180,10 @@ describe('computeCuts', () => {
     const item = pack!.items.find((i) => i.file === 'cay.png' && i.scale > 0.45)!;
     item.overrides.offsetMm = -0.5;
     const inset = computeCuts(pack!, assets, cache).cuts;
-    const bounds = (pts: { x: number; y: number }[]) => ({
-      width: Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)),
-      height: Math.max(...pts.map((p) => p.y)) - Math.min(...pts.map((p) => p.y)),
-    });
+    const bounds = (pts: Parameters<typeof polygonBounds>[0]) => {
+      const b = polygonBounds(pts);
+      return { width: b.maxX - b.minX, height: b.maxY - b.minY };
+    };
     const before = bounds(baseline.get(item.id)!);
     const after = bounds(inset.get(item.id)!);
     expect(before.width - after.width).toBeCloseTo(10, 0); // iki tarafta 0,5 mm; 0,1 mm/tasarım px
@@ -160,7 +201,9 @@ describe('computeCuts', () => {
     pack!.items[2].file = 'opak.png';
     const { cuts, messages } = computeCuts(pack!, assetsOf([...files, opaque]));
     expect(cuts.has(pack!.items[0].id)).toBe(false);
-    expect(cuts.get(pack!.items[2].id)).toHaveLength(4);
+    expect(cuts.get(pack!.items[2].id)).toHaveLength(8); // yuvarlak köşeli dikdörtgen (varsayılan 1.5 mm)
+    pack!.items[2].overrides.rectCornerRadiusMm = 0;
+    expect(computeCuts(pack!, assetsOf([...files, opaque])).cuts.get(pack!.items[2].id)).toHaveLength(4);
     expect(messages.filter((m) => m.level === 'error').map((m) => m.code)).toEqual(['MISSING_FILE']);
   });
 });

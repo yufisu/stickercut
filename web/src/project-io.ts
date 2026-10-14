@@ -2,7 +2,7 @@ import { engine } from './engine';
 import { state, update, type Role } from './state';
 import * as storage from './storage';
 import { shareOrDownload } from './share';
-import { parsePack, serializePack, nextItemId, nfc, type Pack } from '../../src/core/project';
+import { parsePack, serializePack, nextItemId, nfc, itemLabel, type Pack } from '../../src/core/project';
 import { zipToPack } from '../../src/core/zip';
 import type { Message } from '../../src/core/pipeline';
 import { EditHistory } from './history';
@@ -44,14 +44,16 @@ function reviewMessages(pack: Pack, messages: Message[]): Message[] {
   });
   for (const item of pack.items) {
     if (item.needsReview && !kept.some((m) => m.code === 'NEEDS_REVIEW' && m.itemId === item.id)) {
-      kept.push({ level: 'warning', code: 'NEEDS_REVIEW', itemId: item.id, file: item.file,
-        text: `"${item.file.split('/').pop()}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` });
+      kept.push({ level: 'warning', code: 'NEEDS_REVIEW', itemId: item.id, file: item.file ?? undefined,
+        text: `"${itemLabel(item)}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` });
     }
   }
   let marker = 0;
   return kept.map((m) => {
-    if (m.code === 'NEEDS_REVIEW') return { ...m,
-      text: `"${m.file?.split('/').pop() ?? m.itemId}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` };
+    if (m.code === 'NEEDS_REVIEW') {
+      const item = pack.items.find((i) => i.id === m.itemId);
+      return { ...m, text: `"${item ? itemLabel(item) : m.itemId}" otomatik yerleşimi belirsiz. Önizlemedeki turuncu çerçeveye dokunup konumunu kontrol et.` };
+    }
     if (m.code !== 'UNMATCHED_REGION') return m;
     const region = m.region ?? legacyRegion(m.text);
     if (!region) return m;

@@ -1,4 +1,4 @@
-import { type Mask, padMask } from './raster';
+import { type Mask, createMask, padMask } from './raster';
 
 const INF = 1e20;
 
@@ -26,9 +26,10 @@ function edt1d(f: Float64Array, n: number, d: Float64Array, v: Int32Array, z: Fl
   }
 }
 
-export function squaredDistance(m: Mask): Float64Array {
+/** Her piksel için en yakın dolu piksele kare uzaklık (dolu pikselde 0). Tam sayılar Float32'de kesindir. */
+export function squaredDistance(m: Mask): Float32Array {
   const { width: w, height: h } = m;
-  const grid = new Float64Array(w * h);
+  const grid = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) grid[i] = m.data[i] ? 0 : INF;
   const n = Math.max(w, h);
   const f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
@@ -45,18 +46,62 @@ export function squaredDistance(m: Mask): Float64Array {
   return grid;
 }
 
+export function invertMask(m: Mask): Mask {
+  const out = createMask(m.width, m.height);
+  for (let i = 0; i < m.data.length; i++) out.data[i] = m.data[i] ? 0 : 1;
+  return out;
+}
+
+/** İşaretli uzaklık alanı: dışarıda +d (en yakın dolu piksele), içeride −d (en yakın boş piksele). */
+export function signedDistance(m: Mask): Float32Array {
+  const outside = squaredDistance(m);
+  const inside = squaredDistance(invertMask(m));
+  for (let i = 0; i < outside.length; i++) {
+    outside[i] = m.data[i] ? -Math.sqrt(inside[i]) : Math.sqrt(outside[i]);
+  }
+  return outside;
+}
+
+/** `field ≤ level` olan pikseller. */
+export function thresholdField(field: ArrayLike<number>, width: number, height: number, level: number): Mask {
+  const out = createMask(width, height);
+  for (let i = 0; i < out.data.length; i++) out.data[i] = field[i] <= level ? 1 : 0;
+  return out;
+}
+
+/** Yarıçapı r olan disk ile genişletme (Öklid). Maske kenarına taşan kısım kırpılır; çağıran pad'ler. */
+export function dilateMask(m: Mask, r: number): Mask {
+  if (r <= 0) return { width: m.width, height: m.height, data: m.data.slice() };
+  const d2 = squaredDistance(m), r2 = r * r;
+  const out = createMask(m.width, m.height);
+  for (let i = 0; i < d2.length; i++) out.data[i] = d2[i] <= r2 ? 1 : 0;
+  return out;
+}
+
+/** Yarıçapı r olan disk ile aşındırma (Öklid). */
+export function erodeMask(m: Mask, r: number): Mask {
+  if (r <= 0) return { width: m.width, height: m.height, data: m.data.slice() };
+  const d2 = squaredDistance(invertMask(m)), r2 = r * r;
+  const out = createMask(m.width, m.height);
+  for (let i = 0; i < d2.length; i++) out.data[i] = m.data[i] && d2[i] > r2 ? 1 : 0;
+  return out;
+}
+
+/** Kapama: 2r'den dar girintileri doldurur, dış hattı korur. r < 0.5 → kopya. */
+export function closeMask(m: Mask, r: number): Mask {
+  if (r < 0.5) return { width: m.width, height: m.height, data: m.data.slice() };
+  return erodeMask(dilateMask(m, r), r);
+}
+
+/** Açma: 2r'den ince çıkıntıları atar, dışbükey köşeleri r ile yuvarlar. */
+export function openMask(m: Mask, r: number): Mask {
+  if (r < 0.5) return { width: m.width, height: m.height, data: m.data.slice() };
+  return dilateMask(erodeMask(m, r), r);
+}
+
 export function offsetMask(m: Mask, radius: number): { mask: Mask; pad: number } {
   const pad = Math.ceil(Math.max(0, radius)) + 1;
-  const mask = padMask(m, pad);
-  if (radius === 0) return { mask, pad };
-  const r2 = radius * radius;
-  if (radius > 0) {
-    const d2 = squaredDistance(mask);
-    for (let i = 0; i < d2.length; i++) mask.data[i] = d2[i] <= r2 ? 1 : 0;
-  } else {
-    const background: Mask = { width: mask.width, height: mask.height, data: mask.data.map((v) => v ? 0 : 1) };
-    const d2 = squaredDistance(background);
-    for (let i = 0; i < d2.length; i++) mask.data[i] = mask.data[i] && d2[i] > r2 ? 1 : 0;
-  }
-  return { mask, pad };
+  const padded = padMask(m, pad);
+  if (radius === 0) return { mask: padded, pad };
+  return { mask: radius > 0 ? dilateMask(padded, radius) : erodeMask(padded, -radius), pad };
 }

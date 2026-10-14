@@ -77,7 +77,8 @@ export function mountEditor(root: HTMLElement): () => void {
           <label>Kesim ofseti (mm)<input data-k="d.offsetMm" type="number" step="0.05" value="${d.offsetMm}"></label>
           <label>Çizgi (pt)<input data-k="d.strokeWidthPt" type="number" step="0.05" min="0.05" value="${d.strokeWidthPt}"></label>
         </div>
-        <label>Yumuşatma<input data-k="d.smoothing" type="range" min="0" max="1" step="0.05" value="${d.smoothing}"></label>
+        <label>Sıkılık (girinti köprüleme) <output>${d.closingMm.toFixed(1)} mm</output><input data-k="d.closingMm" aria-label="Sıkılık" type="range" min="0" max="3" step="0.1" value="${d.closingMm}"></label>
+        <label>Yumuşatma <output>${d.smoothMm.toFixed(2)} mm</output><input data-k="d.smoothMm" aria-label="Yumuşatma" type="range" min="0" max="1" step="0.05" value="${d.smoothMm}"></label>
         <label>Simplify / nokta azaltma <output>${d.simplifyMm.toFixed(2)} mm</output><input data-k="d.simplifyMm" aria-label="Genel nokta azaltma" type="range" min="0" max="1" step="0.01" value="${d.simplifyMm}"></label>
         <p class="lead">0, ayrıntılı konturu korur. Artırdıkça eğriyi daha az noktayla izler; değer, yumuşatılmış konturdan izin verilen yaklaşık sapmadır.</p>
         <label>Köşe koruma <output>${d.cornerAngleDeg}°</output><input data-k="d.cornerAngleDeg" aria-label="Genel köşe koruma" type="range" min="0" max="180" step="5" value="${d.cornerAngleDeg}"></label>
@@ -87,7 +88,7 @@ export function mountEditor(root: HTMLElement): () => void {
       </section>
       ${item ? `
       <section><h2>Seçili sticker (${esc(item.id)})</h2>
-        <label>Dosya<select data-k="i.file">${opts(item.file)}</select></label>
+        ${item.file === null ? '<p class="lead">Bu öğe tasarımdan alınan bir bölge; PNG dosyası yok.</p>' : `<label>Dosya<select data-k="i.file">${opts(item.file)}</select></label>`}
         <div class="grid2">
           <label>Kesim ofseti (mm)<input data-k="i.offsetMm" type="number" step="0.05" placeholder="Genel: ${d.offsetMm}" value="${item.overrides.offsetMm ?? ''}"></label>
           <label>Döndürme (°)<input data-k="i.rotationDeg" type="number" step="1" value="${item.rotationDeg}"></label>
@@ -172,12 +173,13 @@ export function mountEditor(root: HTMLElement): () => void {
       case 'page.heightMm': if (n > 0) pack.page.heightMm = n; else return; break;
       case 'd.offsetMm': if (el.value !== '' && Number.isFinite(n)) pack.defaults.offsetMm = n; else return; break;
       case 'd.strokeWidthPt': if (n > 0) pack.defaults.strokeWidthPt = n; else return; break;
-      case 'd.smoothing': if (n >= 0 && n <= 1) pack.defaults.smoothing = n; else return; break;
+      case 'd.smoothMm': if (n >= 0 && n <= 1) pack.defaults.smoothMm = n; else return; break;
+      case 'd.closingMm': if (n >= 0 && n <= 3) pack.defaults.closingMm = n; else return; break;
       case 'd.simplifyMm': if (n >= 0 && n <= 1) pack.defaults.simplifyMm = n; else return; break;
       case 'd.cornerAngleDeg': if (n >= 0 && n <= 180) pack.defaults.cornerAngleDeg = n; else return; break;
       case 'd.whiteBorder': pack.defaults.whiteBorder = (el as HTMLInputElement).checked; break;
       case 'showCuts': update((s) => { s.showCuts = (el as HTMLInputElement).checked; }); return;
-      case 'i.file': if (item) item.file = el.value; break;
+      case 'i.file': if (item && item.file !== null) item.file = el.value; break;
       case 'i.offsetMm':
         if (item) { if (el.value === '') delete item.overrides.offsetMm; else if (Number.isFinite(n)) item.overrides.offsetMm = n; else return; }
         break;
@@ -197,6 +199,10 @@ export function mountEditor(root: HTMLElement): () => void {
     if (k === 'd.cornerAngleDeg' || k === 'i.cornerAngleDeg') {
       const output = el.parentElement?.querySelector('output');
       if (output) output.textContent = `${n}°`;
+    }
+    if (k === 'd.smoothMm' || k === 'd.closingMm') {
+      const output = el.parentElement?.querySelector('output');
+      if (output) output.textContent = `${n.toFixed(k === 'd.closingMm' ? 1 : 2)} mm`;
     }
     commit();
     if (redrawFields) renderSettings();

@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import {
-  initPack, computeCuts, buildPackPdf, renderPackPreview, formatMessage, type LoadedFile, type Message,
+  initPack, computeCuts, buildPackPdf, renderPackPreview, formatMessage, packAssetNames, type LoadedFile, type Message,
 } from '../core/pipeline';
 import { parsePack, serializePack, PackError, type Pack } from '../core/project';
 import { packToZip, zipToPack } from '../core/zip';
@@ -13,8 +13,8 @@ export interface Io { out(s: string): void; err(s: string): void }
 const consoleIo: Io = { out: (s) => console.log(s), err: (s) => console.error(s) };
 
 const USAGE = `Kullanım:
-  stickercut init <klasör> [--design dosya] [--background dosya] [--page 80x140] [-o pack.json] [--json]
-  stickercut build <pack.json> [--offset mm] [--white-border | --no-white-border] [--stroke pt] [-o çıktı.pdf] [--json]
+  stickercut init <klasör> [--design dosya] [--background dosya] [--page 80x140] [--no-regions] [-o pack.json] [--json]
+  stickercut build <pack.json> [--offset mm] [--white-border | --no-white-border] [--stroke pt] [--closing mm] [--corner-radius mm] [--smooth mm] [--simplify mm] [-o çıktı.pdf] [--json]
   stickercut preview <pack.json> [--no-cut] [-o önizleme.png]
   stickercut export <pack.json> -o paket.zip
   stickercut import <paket.zip> <klasör> [--force]`;
@@ -63,9 +63,7 @@ function readPack(path: string): Pack {
   return parsePack(readFileSync(path, 'utf8'));
 }
 
-function packFiles(pack: Pack, withDesign: boolean): string[] {
-  return [...new Set([...(withDesign ? [pack.files.design] : []), pack.files.background, ...pack.items.map((i) => i.file)])];
-}
+const packFiles = (pack: Pack, withDesign: boolean): string[] => packAssetNames(pack, withDesign);
 
 function loadPackFiles(packPath: string, names: string[]): Map<string, LoadedFile> {
   const base = dirname(packPath);
@@ -80,8 +78,11 @@ const sibling = (packPath: string, ext: string) => packPath.replace(/\.json$/i, 
 
 async function cmdInit(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parseArgs({
-    args, allowPositionals: true,
-    options: { design: { type: 'string' }, background: { type: 'string' }, page: { type: 'string' }, out: { type: 'string', short: 'o' }, json: { type: 'boolean' } },
+    args, allowPositionals: true, allowNegative: true,
+    options: {
+      design: { type: 'string' }, background: { type: 'string' }, page: { type: 'string' }, out: { type: 'string', short: 'o' },
+      json: { type: 'boolean' }, regions: { type: 'boolean', default: true },
+    },
   });
   if (positionals.length !== 1) throw new UsageError('init tek bir klasör bekler.');
   const dir = resolve(positionals[0]);
@@ -93,6 +94,7 @@ async function cmdInit(args: string[], io: Io): Promise<number> {
   const res = initPack(files, {
     design: hint(values.design), background: hint(values.background),
     page: values.page ? parsePage(values.page) : undefined,
+    regionItems: values.regions,
   });
   if (!res.pack) {
     if (values.json) io.out(JSON.stringify({ ok: false, messages: res.messages }, null, 2));
@@ -120,7 +122,10 @@ async function cmdInit(args: string[], io: Io): Promise<number> {
 async function cmdBuild(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parseArgs({
     args, allowPositionals: true, allowNegative: true,
-    options: { offset: { type: 'string' }, 'white-border': { type: 'boolean' }, stroke: { type: 'string' }, out: { type: 'string', short: 'o' }, json: { type: 'boolean' } },
+    options: {
+      offset: { type: 'string' }, 'white-border': { type: 'boolean' }, stroke: { type: 'string' }, closing: { type: 'string' },
+      'corner-radius': { type: 'string' }, smooth: { type: 'string' }, simplify: { type: 'string' }, out: { type: 'string', short: 'o' }, json: { type: 'boolean' },
+    },
   });
   if (positionals.length !== 1) throw new UsageError('build tek bir pack.json bekler.');
   const packPath = resolve(positionals[0]);
@@ -128,6 +133,10 @@ async function cmdBuild(args: string[], io: Io): Promise<number> {
   if (values.offset !== undefined) pack.defaults.offsetMm = signedNum(values.offset, '--offset');
   if (values['white-border'] !== undefined) pack.defaults.whiteBorder = values['white-border'];
   if (values.stroke !== undefined) pack.defaults.strokeWidthPt = num(values.stroke, '--stroke');
+  if (values.closing !== undefined) pack.defaults.closingMm = num(values.closing, '--closing');
+  if (values['corner-radius'] !== undefined) pack.defaults.cornerRadiusMm = num(values['corner-radius'], '--corner-radius');
+  if (values.smooth !== undefined) pack.defaults.smoothMm = num(values.smooth, '--smooth');
+  if (values.simplify !== undefined) pack.defaults.simplifyMm = num(values.simplify, '--simplify');
   const { pdf, messages } = await buildPackPdf(pack, loadPackFiles(packPath, packFiles(pack, false)));
   const outPath = values.out ? resolve(values.out) : sibling(packPath, '.pdf');
   if (pdf) writeFileSync(outPath, pdf);
@@ -175,7 +184,7 @@ function cmdExport(args: string[], io: Io): number {
   const out: Pack = {
     ...pack,
     files: { design: rename.get(pack.files.design)!, background: rename.get(pack.files.background)! },
-    items: pack.items.map((i) => ({ ...i, file: rename.get(i.file)! })),
+    items: pack.items.map((i) => ({ ...i, file: i.file === null ? null : rename.get(i.file)! })),
   };
   const zipPath = resolve(values.out);
   writeFileSync(zipPath, packToZip(serializePack(out), files));

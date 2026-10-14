@@ -16,16 +16,21 @@
     "dev": "vite",
     "build:web": "vite build",
     "publish:pages": "bash scripts/publish-pages.sh",
-    "cli": "tsx src/cli/main.ts"
+    "cli": "tsx src/cli/main.ts",
+    "cut:stats": "tsx scripts/cut-stats.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@preact/signals": "^2.11.3",
     "fflate": "^0.8.3",
     "idb-keyval": "^6.3.0",
     "pdf-lib": "^1.17.1",
     "pngjs": "^7.0.0",
+    "preact": "^11.0.1",
     "tsx": "^4.23.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.3",
     "@types/pngjs": "^6.0.5",
     "typescript": "^7.0.2",
