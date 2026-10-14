@@ -92,3 +92,35 @@ test('dosya yükle → yerleştir → sticker seç ve it → PDF al', async ({ p
   expect(doc.getPageCount()).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test('tek sayfa modu: yalnızca sticker sayfası → şekiller bulunur → PDF', async ({ page }, testInfo) => {
+  const touch = testInfo.project.name === 'ipad';
+  if (touch) await stubShare(page);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+
+  const dir = testInfo.outputPath('tek');
+  mkdirSync(dir, { recursive: true });
+  const sheet = join(dir, 'sayfa.png');
+  writeFileSync(sheet, encodePng(makeScene().design));
+  await page.goto('/');
+  await page.locator('#picker').setInputFiles([sheet]);
+  await expect(page.locator('.file-card')).toHaveCount(1);
+  await expect(page.locator('.file-card.design .name')).toHaveText('sayfa.png');
+  await expect(page.locator('.single-sheet')).toContainText('Tek sayfa modu');
+  await expect(page.locator('.single-sheet')).toContainText('#c8dc8c');
+  await expect(page.locator('#place')).toBeEnabled();
+
+  await page.locator('#place').click();
+  await expect(page.locator('.editor')).toBeVisible();
+  if (touch) await page.getByRole('button', { name: 'Katmanlar' }).click();
+  await expect(page.locator('.layer')).toHaveCount(4);
+  await expect(page.locator('.layer .badge.ok')).toHaveCount(4, { timeout: 60_000 });
+  if (touch) await page.locator('.scrim').click();
+
+  const bytes = await exportedPdf(page, () => page.locator('#pdf').click(), touch);
+  const doc = await PDFDocument.load(bytes);
+  expect(doc.getPageCount()).toBe(2);
+  expect(errors).toEqual([]);
+});

@@ -4,6 +4,7 @@ import type { Message } from '../../../src/core/pipeline';
 import type { Pt, Coord } from '../../../src/core/geometry';
 import type { CompareResult } from '../../../src/core/compare';
 import type { Phase, CutStats } from '../engine/protocol';
+import type { SheetBackground } from '../../../src/core/sheet';
 import { reviewMessages } from './messages';
 import { itemStatuses, type ItemStatus } from './status';
 
@@ -99,6 +100,8 @@ export const store = {
   showReference: signal(true),
   // dışa aktarma seçenekleri
   exportOptions: signal<{ layers: boolean; spotColor: boolean; spotName: string; bleedMm: number; pngDpi: number }>({ layers: true, spotColor: false, spotName: 'CutContour', bleedMm: 0, pngDpi: 300 }),
+  /** Tek sayfa modunda tasarımın arka plan kestirimi (kurulum ekranında renk örneği/uyarı için). */
+  sheetHint: signal<(SheetBackground & { file: string }) | null>(null),
   /** Rol atamasına kullanıcı elle dokunduysa otomatik atama yeni dosyalara karışmaz. */
   rolesLocked: signal(false),
   /** Yerleştirmeden sonra tuvali sığdır. */

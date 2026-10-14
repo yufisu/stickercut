@@ -13,7 +13,7 @@ export function listPngs(dir: string): string[] {
       if (e.name.startsWith('.')) continue;
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.png$/i.test(e.name) && !/\.preview\.png$/i.test(e.name)) out.push(p);
+      else if (/\.png$/i.test(e.name) && !/\.(preview|arkaplan)\.png$/i.test(e.name)) out.push(p); // araç çıktıları girdi değildir
     }
   };
   walk(dir);

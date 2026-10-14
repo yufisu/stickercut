@@ -53,6 +53,12 @@ export function diffMask(design: Raster, background: Raster, threshold: number):
   return m;
 }
 
+/** Şeffaflık farkını da çizim say: beyaz üzerine birleştirmede kaybolan beyaz alanlar (şeffaf sayfada beyaz sticker) için. */
+export function addAlphaDiff(diff: Mask, design: Raster, background: Raster, threshold: number): void {
+  const a = design.data, b = background.data;
+  for (let i = 0, o = 3; i < diff.data.length; i++, o += 4) if (Math.abs(a[o] - b[o]) > threshold) diff.data[i] = 1;
+}
+
 export function findRegions(diff: Mask, minAreaRatio: number): Region[] {
   const opened = dilateSquare(erodeSquare(diff, 1), 1);
   const closed = erodeSquare(dilateSquare(opened, 4), 4);
@@ -168,7 +174,9 @@ export function* matchStickersSteps(
   }
   const o = { ...DEFAULT_MATCH_OPTIONS, ...options };
   const dc = compositeOverWhite(design);
-  const regions = findRegions(diffMask(dc, compositeOverWhite(background), o.diffThreshold), o.minAreaRatio);
+  const diff = diffMask(dc, compositeOverWhite(background), o.diffThreshold);
+  addAlphaDiff(diff, design, background, o.diffThreshold);
+  const regions = findRegions(diff, o.minAreaRatio);
   const prepared = stickers.map(prepareSticker).filter((p): p is Prepared => p !== null);
   const used = new Set<string>();
   const items: MatchedItem[] = [];

@@ -27,7 +27,7 @@ export function regionRaster(design: RegionAsset, region: { bbox: BBox; rle: str
       if (!mask.data[y * bbox.w + x]) continue;
       const sx = Math.min(src.width - 1, Math.max(0, Math.floor((bbox.x + x + 0.5) * k)));
       const si = (sy * src.width + sx) * 4, di = (y * bbox.w + x) * 4;
-      out.data[di] = src.data[si]; out.data[di + 1] = src.data[si + 1]; out.data[di + 2] = src.data[si + 2]; out.data[di + 3] = 255;
+      out.data[di] = src.data[si]; out.data[di + 1] = src.data[si + 1]; out.data[di + 2] = src.data[si + 2]; out.data[di + 3] = src.data[si + 3];
     }
   }
   return out;

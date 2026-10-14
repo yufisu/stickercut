@@ -160,3 +160,9 @@
   .sheet[data-detent="peek"] .tabs, .sheet[data-detent="peek"] .inspector { display: none; }
   .sheet .export-foot { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 }
+
+/* Tek sayfa modu bilgisi */
+.single-sheet { border-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 45%, var(--panel)); }
+.single-sheet h2 span { display: inline-flex; align-items: center; gap: 8px; }
+.single-sheet .swatch-line { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.swatch-chip { display: inline-block; width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line-strong); }

@@ -1,5 +1,6 @@
 import type { Raster } from './raster';
 import { nfc } from './project';
+import { estimateSheetBackground, type SheetBackground } from './sheet';
 
 export interface RoleInput { file: string; raster: Raster }
 export interface RoleResult {
@@ -8,6 +9,10 @@ export interface RoleResult {
   stickers: string[];
   ambiguous: boolean;
   reason?: string;
+  /** Tek sayfa modu: arka plan dosyası yok, tasarımdan üretilecek. */
+  single?: boolean;
+  /** Tek sayfa modunda tasarımın arka plan kestirimi (kurulum ekranı için). */
+  sheet?: SheetBackground;
 }
 
 const BG_HINT = /arka|background|\bbg\b|boş|bos\b|empty/i;
@@ -32,13 +37,25 @@ export function contentScore(r: Raster): number {
   return total ? 1 - dominant / total : 0;
 }
 
-export function assignRoles(inputs: RoleInput[], hints: { design?: string; background?: string } = {}): RoleResult {
+export interface RoleHints {
+  design?: string;
+  background?: string;
+  /** Arka plan kullanma: tasarım tek sayfa modunda işlenir. */
+  noBackground?: boolean;
+}
+
+export function assignRoles(inputs: RoleInput[], hints: RoleHints = {}): RoleResult {
   const all = inputs.map((i) => ({ ...i, file: nfc(i.file) }));
   const transparent = new Set(all.filter((i) => transparencyRatio(i.raster) >= 0.05).map((i) => i.file));
   const opaque = all.filter((i) => !transparent.has(i.file));
   const stickersExcept = (...names: string[]) => [...transparent].filter((f) => !names.includes(f));
   const hd = hints.design && nfc(hints.design), hb = hints.background && nfc(hints.background);
+  const single = (design: string): RoleResult => {
+    const raster = all.find((i) => i.file === design)?.raster;
+    return { design, background: null, stickers: stickersExcept(design), ambiguous: false, single: true, sheet: raster && estimateSheetBackground(raster) };
+  };
 
+  if (hd && hints.noBackground) return single(hd);
   if (hd && hb) return { design: hd, background: hb, stickers: stickersExcept(hd, hb), ambiguous: false };
 
   const sizeKey = (r: Raster) => `${r.width}x${r.height}`;
@@ -49,11 +66,17 @@ export function assignRoles(inputs: RoleInput[], hints: { design?: string; backg
       const [design, background] = hd ? [given.file, partner.file] : [partner.file, given.file];
       return { design, background, stickers: stickersExcept(design, background), ambiguous: false };
     }
+    if (hd && given) return single(hd);
   }
 
   const groups = new Map<string, RoleInput[]>();
   for (const i of opaque) groups.set(sizeKey(i.raster), [...(groups.get(sizeKey(i.raster)) ?? []), i]);
   const pairs = [...groups.values()].filter((g) => g.length >= 2);
+  if (!pairs.length) {
+    // Tek opak sayfa (artı isteğe bağlı şeffaf sticker'lar) ya da tek başına şeffaf bir sayfa.
+    if (opaque.length === 1) return single(opaque[0].file);
+    if (all.length === 1) return single(all[0].file);
+  }
   if (pairs.length !== 1 || pairs[0].length !== 2) {
     return {
       design: null,
@@ -61,7 +84,7 @@ export function assignRoles(inputs: RoleInput[], hints: { design?: string; backg
       stickers: [...transparent],
       ambiguous: true,
       reason: pairs.length === 0
-        ? 'Aynı boyutta iki opak PNG (tam tasarım + arka plan) bulunamadı.'
+        ? 'Aynı boyutta iki opak PNG (tam tasarım + arka plan) bulunamadı. Yalnızca sticker sayfası yüklüyorsan onu Tam tasarım olarak seç.'
         : 'Birden fazla tam tasarım/arka plan adayı var; hangisinin kullanılacağını seç.',
     };
   }

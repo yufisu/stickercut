@@ -8,7 +8,7 @@ Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden, Ill
 
 `npm ci && npm run dev` ile yerel arayüzü aç (`http://localhost:5173`). iPad Safari ve Mac tarayıcısında çalışır.
 
-1. **Kurulum:** PNG'leri bırak ya da *Dosyalar'dan seç* (iPad'de *Fotoğraflar'dan* seçersen dosya adları `IMG_…` olur; rolleri kartlardan düzelt). Aynı boyutlu iki opak PNG tam tasarım ve arka plan olarak otomatik tanınır. Sayfa ölçüsünü ve kesim stilini (**Yapışık**, **0.5 mm pay**, **Beyaz kenar 1 mm**) seç, **Yerleştir**'e dokun. İlk kez deniyorsan *Örnek pack'i dene*.
+1. **Kurulum:** En kısa yol: yalnızca sticker dolu sayfayı bırak (**tek sayfa modu**, aşağıya bak). Daha kesin sonuç için sticker'sız arka planı ve tek tek sticker PNG'lerini de ekle. PNG'leri bırak ya da *Dosyalar'dan seç* (iPad'de *Fotoğraflar'dan* seçersen dosya adları `IMG_…` olur; rolleri kartlardan düzelt). Aynı boyutlu iki opak PNG tam tasarım ve arka plan olarak otomatik tanınır. Sayfa ölçüsünü ve kesim stilini (**Yapışık**, **0.5 mm pay**, **Beyaz kenar 1 mm**) seç, **Yerleştir**'e dokun. İlk kez deniyorsan *Örnek pack'i dene*.
 2. **Editör:** Sol araç çubuğu (seç, gez, sticker ekle, bölge, ölçü), mm cetvelli tuval, altta katman listesi, sağda sekmeli denetçi (*Sticker · Sayfa · Kesim · Kontrol*), altta durum çubuğu. Sürükle-taşı, köşeden ölçekle, üst tutamaçla döndür; Shift ile çoklu seçim, ok tuşlarıyla 0.1 mm it, hizalama/dağıtma düğmeleri. Hizalama kılavuzlarına yapışır (Alt kapatır). Görünüm: *Düzenle · Kesim sayfası · Baskı önizleme*. iPad'de denetçi alt sayfa, katmanlar soldan kayan panel; iki parmakla yakınlaştır.
 3. **Kesim ayarları:** Ofset (mm, işaretli), sıkılık (dar girintileri köprüler), yumuşatma, sadeleştirme toleransı, köşe koruma, dışbükey köşe yuvarlama, opak PNG köşe yarıçapı, parça köprüleme, alfa eşiği. Her ayar sticker başına da ezilebilir.
 4. **Kontrol:** Belirsiz yerleşimler, eşleşmeyen bölgeler (tuvalde numaralı işaret; *Bu bölgeye yerleştir* ya da *Yok say*), kullanılmayan PNG'ler, kesimler arası en az boşluk, sayfa kenarı, çakışma ve çizime girme uyarıları. Elle hazırlanmış bir Illustrator PDF'ini **referans** olarak yükleyip çizgileri üst üste ve ölçülerle karşılaştırabilirsin.
@@ -16,13 +16,15 @@ Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden, Ill
 
 **PNG'si olmayan çizimler:** Tasarımda olup sticker PNG'si verilmeyen her çizim, tasarımın kendisinden kesilen bir *bölge öğesi* olur. Yalnızca tam tasarım + arka plan ile de çalışır.
 
+**Tek sayfa modu:** Yalnızca sticker sayfası yüklenirse arka plan sayfanın kendisinden çıkarılır. Baskın düz renk ya da şeffaf alanlar arka plan sayılır, ondan ayrışan her ada bir şekil olur. Sticker'sız arka plan, şekillerin yeri çevre rengiyle doldurularak üretilir; böylece baskı sayfası yüklenen sayfanın birebir aynısı kalır, küçük süsler ve yazılar yerinde durur. Sayfa kenarına dayanan alanlar (başlık bandı, çerçeve, köşe süsü) kesilmez. Başlık ve yazılar da şekil sayılabilir; kesilmesin istediklerini katman listesinde makasla "sadece baskı" yap (silme: silinen şekil baskıdan da kalkar). Arka plan desenli, ızgaralı ya da resimliyse şekiller ayrılamaz; uygulama bunu söyler ve sticker'sız arka planı istemeyi önerir.
+
 ## CLI
 
 Node 22 veya üstü gerekir.
 
 ```sh
 npm ci
-node bin/stickercut.mjs init "<pack klasörü>" --page 80x140          # pack.json + önizleme
+node bin/stickercut.mjs init "<pack klasörü>" --page 80x140          # pack.json + önizleme (tek sayfa varsa <pack>.arkaplan.png üretir)
 node bin/stickercut.mjs build "<pack klasörü>/pack.json"              # 2 sayfalı PDF
 node bin/stickercut.mjs doctor "<pack.json>" --strict                 # kalite raporu, hata varsa 1 döner
 node bin/stickercut.mjs compare "<pack.json>" "<illustrator.pdf>"      # referansla ölçülü karşılaştırma

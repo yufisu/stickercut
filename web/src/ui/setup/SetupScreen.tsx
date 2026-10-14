@@ -9,6 +9,8 @@ import { Icon } from '../shared/Icon';
 import { IconButton, NumberField, Thumb } from '../shared/controls';
 import { ThemeToggle } from '../shared/ThemeToggle';
 
+const hexOf = (rgb: number[]) => `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+
 const ROLE_LABELS: [Role, string][] = [['design', 'Tam tasarım'], ['background', 'Arka plan'], ['sticker', 'Sticker'], ['ignore', 'Yok say']];
 
 function DropZone() {
@@ -24,12 +26,12 @@ function DropZone() {
     >
       <input ref={files} type="file" multiple accept=".png,.PNG,image/png,.zip,application/zip" hidden onChange={() => pick(files.current)} id="picker" />
       <input ref={photos} type="file" multiple accept="image/png" hidden onChange={() => pick(photos.current)} />
-      <div class="big">Tasarımı, arka planı ve sticker'ları bırak</div>
+      <div class="big">Sticker sayfanı bırak</div>
       <div class="row">
         <button type="button" class="btn" disabled={disabled} onClick={() => files.current?.click()}><Icon name="folder" /> Dosyalar'dan seç</button>
         <button type="button" class="btn" disabled={disabled} onClick={() => photos.current?.click()}><Icon name="photo" /> Fotoğraflar'dan</button>
       </div>
-      <p class="hint">Tam tasarım ile stickersız arka plan aynı piksel boyutunda olmalı; sticker'lar şeffaf PNG. Daha önce dışa aktardığın bir proje .zip'ini de bırakabilirsin. Dosyalar cihazından çıkmaz.</p>
+      <p class="hint">Tek bir sayfa yeter: arka planı düz renk ya da şeffafsa sticker'lar sayfadan bulunur. Varsa sticker'sız arka planı ve tek tek sticker PNG'lerini de ekle; sonuç daha kesin olur. Proje .zip'i de açılır. Dosyalar cihazından çıkmaz.</p>
     </div>
   );
 }
@@ -74,7 +76,11 @@ export function SetupScreen() {
   const page = store.pageSetup.value;
   const notice = store.notice.value;
   const disabled = busy.value;
-  const canPlace = !disabled && sameSize;
+  // Arka plan yoksa tek sayfa modu: arka plan tasarımın kendisinden üretilir.
+  const single = !!design && !background;
+  const canPlace = !disabled && (sameSize || single);
+  const hint = store.sheetHint.value;
+  const sheet = single && hint?.file === design?.name ? hint : null;
   const autoHeight = design ? Math.round((page.widthMm * design.height / design.width) * 10) / 10 : null;
   return (
     <div class="setup desk-bg">
@@ -94,8 +100,25 @@ export function SetupScreen() {
               <h2>Dosyalar <span class="hint num">{files.length} dosya · {stickers} sticker</span></h2>
               <div class="file-grid">{files.map((f) => <FileCard key={f.name} f={f} />)}</div>
               {design && background && !sameSize ? <p class="msg warning"><span class="dot" /><span>Tam tasarım ({design.width}×{design.height}) ile arka plan ({background.width}×{background.height}) aynı boyutta değil.</span></p> : null}
-              {!design || !background ? <p class="hint">Tam tasarım ve arka plan rollerini kartlardan seç. Aynı boyutlu iki opak PNG otomatik tanınır.</p> : null}
+              {!design ? <p class="hint">Sticker sayfasını kartlardan Tam tasarım olarak seç. Sticker'sız arka plan da varsa onu Arka plan yap; yoksa arka plan sayfadan üretilir.</p> : null}
               {design && background && !stickers ? <p class="hint">Sticker PNG'si yoksa sorun değil: her çizim tasarımdan bölge olarak kesilir.</p> : null}
+            </section>
+          ) : null}
+          {single ? (
+            <section class="panel single-sheet" aria-live="polite">
+              <h2><span><Icon name="sparkle" /> Tek sayfa modu</span></h2>
+              <p>Arka plan dosyası yok; sticker'lar <b>{design!.name}</b> sayfasının içinden bulunacak ve her birine kesim çizgisi çıkarılacak. Baskı sayfası yüklediğin sayfanın aynısı olur.</p>
+              {sheet ? (
+                <p class="swatch-line">
+                  {sheet.kind === 'transparent'
+                    ? <>Arka plan: <b>şeffaf</b></>
+                    : <>Arka plan rengi: <span class="swatch-chip" style={{ background: `rgb(${sheet.rgb.join(',')})` }} /> <b class="num">{hexOf(sheet.rgb)}</b></>}
+                </p>
+              ) : null}
+              {sheet && sheet.edgeCoverage < 0.5 ? (
+                <p class="msg warning"><span class="dot" /><span>Sayfanın kenarları tek renk değil (desen, bant ya da degrade var). Sonuç eksik olabilir; sticker'sız arka plan PNG'sini de eklemek en iyisi.</span></p>
+              ) : null}
+              <p class="hint">Sayfa kenarına dayanan bant ve süsler kesilmez. Başlık ve yazılar da şekil sayılabilir; kesilmesin istediklerini sonra katman listesinde makas düğmesiyle "sadece baskı" yap.</p>
             </section>
           ) : null}
           {notice ? <div class="notice"><p class={`msg ${notice.level}`}><span class="dot" /><span>{notice.text}</span></p></div> : null}

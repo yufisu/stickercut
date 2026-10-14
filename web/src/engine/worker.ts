@@ -74,7 +74,11 @@ async function run(job: JobId, task: Task): Promise<{ result: unknown; transfer?
       const steps = paced(job, initPackSteps([...files.values()], task.options));
       let r = await steps.next();
       while (!r.done) { progress(job, r.value.phase, r.value.done, r.value.total); r = await steps.next(); }
-      return { result: r.value };
+      const { syntheticBackground: synthetic, ...rest } = r.value;
+      if (!synthetic) return { result: rest };
+      // Tek sayfa modu: sayfadan üretilen arka plan bu worker'ın dosyası olur (PDF, zip, önizleme için).
+      files.set(synthetic.name, synthetic);
+      return { result: { ...rest, syntheticBackground: { name: synthetic.name, bytes: synthetic.bytes, width: synthetic.width, height: synthetic.height } } };
     }
     case 'cuts': {
       const pack = parsePack(task.packJson);

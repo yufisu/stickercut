@@ -3,6 +3,7 @@ import { initPack, computeCuts, prepareLoadedFile, renderPackPreview, type Loade
 import { checkLayout } from '../../src/core/checks';
 import { createRaster } from '../../src/core/render';
 import { polygonBounds } from '../../src/core/geometry';
+import { decodePng } from '../../src/cli/png';
 import { makeScene, paint } from '../helpers/scene';
 
 const EMPTY = new Uint8Array(0);
@@ -131,6 +132,56 @@ describe('initPack', () => {
     const cays = res.pack!.items.filter((i) => i.file === 'cay.png').map((i) => i.scale).sort();
     expect(cays[0]).toBeCloseTo(0.2, 2);
     expect(cays[1]).toBeCloseTo(0.25, 2);
+  });
+});
+
+describe('initPack — tek sayfa modu', () => {
+  const sheetOnly = () => [prepareLoadedFile('sayfa.png', EMPTY, makeScene().design)];
+
+  it('yalnızca sticker sayfasından bölge öğeleri ve sticker’sız arka plan üretir', () => {
+    const files = sheetOnly();
+    const res = initPack(files, { page: { widthMm: 80 } });
+    expect(res.pack).not.toBeNull();
+    const bg = res.syntheticBackground!;
+    expect(bg.name).toBe('otomatik arka plan.png');
+    expect([bg.width, bg.height]).toEqual([800, 1200]);
+    expect(decodePng(bg.bytes).width).toBe(800);
+    expect(res.pack!.files).toEqual({ design: 'sayfa.png', background: 'otomatik arka plan.png' });
+    expect(res.pack!.items).toHaveLength(4);
+    expect(res.pack!.items.every((i) => i.file === null && !i.needsReview)).toBe(true);
+    expect(res.messages.find((m) => m.code === 'SINGLE_SHEET')?.text).toContain('4 şekil');
+    const assets = assetsOf([...files, bg]);
+    const { cuts, messages } = computeCuts(res.pack!, assets);
+    expect(cuts.size).toBe(4);
+    expect(messages.filter((m) => m.level === 'error')).toEqual([]);
+    expect(renderPackPreview(res.pack!, assets, cuts).width).toBe(800);
+  });
+
+  it('sayfa + sticker PNG’leri: sticker’lar eşleşir, arka plan yine sayfadan gelir', () => {
+    const s = makeScene();
+    const files = [prepareLoadedFile('sayfa.png', EMPTY, s.design), ...s.stickers.map((st) => prepareLoadedFile(st.file, EMPTY, st.raster))];
+    const res = initPack(files, { page: { widthMm: 80 } });
+    expect(res.syntheticBackground).toBeDefined();
+    expect(res.pack!.items.map((i) => i.file).sort()).toEqual(['baklava.png', 'cay.png', 'cay.png', 'kahve.png']);
+  });
+
+  it('background: null aynı boyutlu eşi yok sayar; ad çakışması numaralanır', () => {
+    const s = makeScene();
+    const files = [
+      prepareLoadedFile('sayfa.png', EMPTY, s.design), prepareLoadedFile('arka.png', EMPTY, s.background),
+      prepareLoadedFile('otomatik arka plan.png', EMPTY, createRaster(4, 4)),
+    ];
+    const res = initPack(files, { design: 'sayfa.png', background: null, page: { widthMm: 80 } });
+    expect(res.syntheticBackground?.name).toBe('otomatik arka plan 2.png');
+    expect(res.pack!.files.background).toBe('otomatik arka plan 2.png');
+  });
+
+  it('desenli arka planda anlaşılır hata verir', () => {
+    const grid = paint(800, 1200, (x, y) => (x % 40 < 4 || y % 40 < 4 ? [40, 90, 220, 255] : [250, 245, 170, 255]));
+    const res = initPack([prepareLoadedFile('izgara.png', EMPTY, grid)]);
+    expect(res.pack).toBeNull();
+    expect(res.messages[0]).toMatchObject({ level: 'error', code: 'SHEET_BUSY' });
+    expect(res.messages[0].text).toContain('arka plan PNG');
   });
 });
 

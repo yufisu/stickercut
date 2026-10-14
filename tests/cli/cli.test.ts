@@ -129,6 +129,23 @@ describe('cli', () => {
     expect(await run(['doctor', pack, '--margin', '60', '--strict'], io)).toBe(1); // 60 mm kenar payı her şeyi uyarır
   });
 
+  it('tek sticker sayfası: arka planı sayfadan üretir, build çalışır, tekrar init üretileni girdi saymaz', async () => {
+    const single = mkdtempSync(join(tmpdir(), 'sc-tek-'));
+    writeFileSync(join(single, 'sayfa.png'), encodePng(makeScene().design));
+    expect(await run(['init', single, '--page', '80x120', '--json'], io)).toBe(0);
+    const out = JSON.parse(lines.join('\n'));
+    expect(out.syntheticBackground).toBe(join(single, 'pack.arkaplan.png'));
+    expect(existsSync(out.syntheticBackground)).toBe(true);
+    expect(out.regionItems).toBe(4);
+    const pack = JSON.parse(readFileSync(join(single, 'pack.json'), 'utf8'));
+    expect(pack.files).toEqual({ design: 'sayfa.png', background: 'pack.arkaplan.png' });
+    expect(await run(['build', join(single, 'pack.json')], io)).toBe(0);
+    expect((await PDFDocument.load(readFileSync(join(single, 'pack.pdf')))).getPageCount()).toBe(2);
+    lines = [];
+    expect(await run(['init', single, '--page', '80x120', '--json'], io)).toBe(0);
+    expect(JSON.parse(lines.join('\n')).syntheticBackground).toBe(join(single, 'pack.arkaplan.png'));
+  });
+
   it('bilinmeyen komut kullanım metni ve 2 döner', async () => {
     expect(await run(['yok'], io)).toBe(2);
     expect(lines.join('\n')).toContain('Kullanım');

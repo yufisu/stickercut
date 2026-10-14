@@ -24,6 +24,7 @@ const consoleIo: Io = { out: (s) => console.log(s), err: (s) => console.error(s)
 
 const USAGE = `Kullanım:
   stickercut init <klasör> [--design dosya] [--background dosya] [--page 80x140] [--no-regions] [-o pack.json] [--json]
+                  (klasörde tek sticker sayfası varsa arka plan sayfadan üretilir: <pack>.arkaplan.png)
   stickercut build <pack.json> [--offset mm] [--white-border | --no-white-border] [--stroke pt] [--closing mm] [--corner-radius mm]
                    [--smooth mm] [--simplify mm] [--svg] [--print-svg] [--png-dir klasör] [--dpi 300] [--package]
                    [--cut-only] [--spot] [--spot-name CutContour] [--no-layers] [--bleed mm] [-o çıktı.pdf] [--json]
@@ -113,6 +114,7 @@ async function cmdInit(args: string[], io: Io): Promise<number> {
     design: hint(values.design), background: hint(values.background),
     page: values.page ? parsePage(values.page) : undefined,
     regionItems: values.regions,
+    syntheticBackgroundName: toPackName(base, sibling(packPath, '.arkaplan.png')),
   });
   if (!res.pack) {
     if (values.json) io.out(JSON.stringify({ ok: false, messages: res.messages }, null, 2));
@@ -122,6 +124,9 @@ async function cmdInit(args: string[], io: Io): Promise<number> {
   mkdirSync(base, { recursive: true });
   writeFileSync(packPath, serializePack(res.pack));
   const assets = new Map(files.map((f) => [f.name, f]));
+  const synthetic = res.syntheticBackground;
+  const syntheticPath = synthetic ? join(base, ...synthetic.name.split('/')) : null;
+  if (synthetic && syntheticPath) { writeFileSync(syntheticPath, synthetic.bytes); assets.set(synthetic.name, synthetic); }
   const { cuts, messages: cutMessages } = computeCuts(res.pack, assets);
   const previewPath = sibling(packPath, '.preview.png');
   writeFileSync(previewPath, encodePng(renderPackPreview(res.pack, assets, cuts)));
@@ -129,10 +134,11 @@ async function cmdInit(args: string[], io: Io): Promise<number> {
   const needsReview = res.pack.items.filter((i) => i.needsReview).length;
   const regions = res.pack.items.filter((i) => i.file === null).length;
   if (values.json) {
-    io.out(JSON.stringify({ ok: true, packPath, previewPath, items: res.pack.items.length, needsReview, regionItems: regions, messages }, null, 2));
+    io.out(JSON.stringify({ ok: true, packPath, previewPath, syntheticBackground: syntheticPath, items: res.pack.items.length, needsReview, regionItems: regions, messages }, null, 2));
   } else {
     io.out(`${res.pack.items.length} sticker yerleştirildi${needsReview ? `, ${needsReview} tanesi kontrol bekliyor` : ''}${regions ? `, ${regions} tanesi tasarımdan alınan bölge` : ''} → ${packPath}`);
     io.out(`Önizleme: ${previewPath}`);
+    if (syntheticPath) io.out(`Arka plan sayfadan üretildi: ${syntheticPath}`);
     report(io, messages);
   }
   return messages.some((m) => m.level === 'error') ? 1 : 0;

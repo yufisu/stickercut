@@ -41,17 +41,25 @@ Plan: `~/.claude/plans/noble-finding-aho.md` (onaylandı, 14 Ekim 2026). Kararla
 - [x] tests/web/actions.test.ts (eski files.test yerine)
 - [x] publish:pages + main push
 
-## Sonraki iş — Tek dosya modu (onaylandı, 14 Ekim 2026; henüz başlanmadı)
+## Tek dosya modu (14 Ekim 2026, tamamlandı)
 
 Amaç: Kullanıcı yalnızca sticker dolu sayfayı (tek opak ya da şeffaf PNG) yükler; arka plan ve sticker PNG'leri olmadan şekiller bulunur, her biri bölge öğesi olarak kesilir. Motor değişmez; eksik parça arka planı kestirmek.
 
-- [ ] `src/core/roles.ts`: `estimateBackground(raster)` → `{ kind: 'flat', rgb } | { kind: 'transparent' } | { kind: 'patterned' }`. Kenar şeridi (genişliğin %2'si) örneklenir, medyan renk alınır; piksellerin ≥ %90'ı medyana maks kanal farkı ≤ 24 içindeyse düz. Alfa < 128 oranı ≥ %5 ise şeffaf.
-- [ ] `src/core/pipeline.ts`: `initPack` arka plan verilmemiş tek tasarımı kabul eder: düz/şeffaf ise aynı boyutta sanal arka plan rasteri (düz renk; şeffafta beyaz) üretir, `encodePngRgba` ile `arkaplan-duz.png` adlı `LoadedFile` yapar, dosya haritasına ekler ve mevcut design-only hattı (bölge öğeleri) çalışır. Sonuçta `syntheticBackground?: { name, bytes }` döner. Desenli ise `ROLES` hatası: "Arka plan düz değil; stickersız arka plan PNG'sini de yükle."
-- [ ] Worker/engine: `init` sonucu sanal arka planı taşır; ana iş parçacığı bunu `FileEntry` (bytes + bitmap + thumb, role 'background') olarak kaydeder ki tuval ve dışa aktarma değişmeden çalışsın.
-- [ ] Web kurulum: tek opak PNG → rol 'design', ipucu "Tek sayfa modu: arka plan düz ya da şeffaf olmalı; süs ve yazılar da şekil olarak bulunur, kesilmesin istediklerini katmanda makasla kapat". `Yerleştir` yalnızca tasarımla açılır (`placement.ts` arka plan koşulu gevşer).
-- [ ] CLI: `init` tek PNG ile çalışır; `--json` çıktısına `syntheticBackground` eklenir.
-- [ ] Testler: `roles.test` (düz/şeffaf/desenli), `pipeline.test` (tek tasarım → N bölge öğesi, sanal arka plan dosyası), e2e: tek PNG yükle → yerleştir → kesimler → PDF.
-- [ ] Not: şeffaf 2048 px üstü tasarım analiz için küçülür; bölge koordinatları mevcut `k` ölçeğiyle geri çevrilir. Birbirine değen stickerlar tek ada olur; Bölge aracı ile ayrı kesim eklenebilir.
+- [x] (ölçümle değişti, aşağıya bak) `src/core/roles.ts`: `estimateBackground(raster)` → `{ kind: 'flat', rgb } | { kind: 'transparent' } | { kind: 'patterned' }`. Kenar şeridi (genişliğin %2'si) örneklenir, medyan renk alınır; piksellerin ≥ %90'ı medyana maks kanal farkı ≤ 24 içindeyse düz. Alfa < 128 oranı ≥ %5 ise şeffaf.
+- [x] (değişti: düz renk yerine sayfadan silinmiş arka plan) `src/core/pipeline.ts`: `initPack` arka plan verilmemiş tek tasarımı kabul eder: düz/şeffaf ise aynı boyutta sanal arka plan rasteri (düz renk; şeffafta beyaz) üretir, `encodePngRgba` ile `arkaplan-duz.png` adlı `LoadedFile` yapar, dosya haritasına ekler ve mevcut design-only hattı (bölge öğeleri) çalışır. Sonuçta `syntheticBackground?: { name, bytes }` döner. Desenli ise `ROLES` hatası: "Arka plan düz değil; stickersız arka plan PNG'sini de yükle."
+- [x] Worker/engine: `init` sonucu sanal arka planı taşır; ana iş parçacığı bunu `FileEntry` (bytes + bitmap + thumb, role 'background') olarak kaydeder ki tuval ve dışa aktarma değişmeden çalışsın.
+- [x] Web kurulum: tek opak PNG → rol 'design', ipucu "Tek sayfa modu: arka plan düz ya da şeffaf olmalı; süs ve yazılar da şekil olarak bulunur, kesilmesin istediklerini katmanda makasla kapat". `Yerleştir` yalnızca tasarımla açılır (`placement.ts` arka plan koşulu gevşer).
+- [x] CLI: `init` tek PNG ile çalışır; `--json` çıktısına `syntheticBackground` eklenir.
+- [x] Testler: `roles.test` (düz/şeffaf/desenli), `pipeline.test` (tek tasarım → N bölge öğesi, sanal arka plan dosyası), e2e: tek PNG yükle → yerleştir → kesimler → PDF.
+- [x] Not: şeffaf 2048 px üstü tasarım analiz için küçülür; bölge koordinatları mevcut `k` ölçeğiyle geri çevrilir. Birbirine değen stickerlar tek ada olur; Bölge aracı ile ayrı kesim eklenebilir.
+
+### Uygulamada değişenler
+- Kenar şeridi testi gerçek sayfaların yarısını reddediyordu (çerçeve, başlık bandı, degrade). Yerine: tüm sayfanın baskın rengi (ya da ≥%20 şeffaflık) arka plan; ondan 48'den fazla ayrışan adalar şekil.
+- Düz renkli sanal arka plan küçük süsleri ve yazıları baskıdan silerdi. Yerine `src/core/sheet.ts`: arka plan = sayfanın kendisi, yalnızca şekillerin yeri çevre halkasının rengiyle (ya da şeffaflıkla) doldurulur. Baskı ≈ kaynak (kahve: piksellerin %0.06'sı > 64 fark).
+- Sayfa kenarına değen adalar arka planda kalır (kesilemez). Kenara değen alanlar sayfanın > %40'ı ya da hiç şekil yoksa `SHEET_BUSY` hatası; ≥ %15 ise uyarı.
+- Şeffaf sayfada beyaz sticker kaybolmasın diye eşleştirme farkına alfa farkı eklendi.
+- `TIGHT_SPOT` eşiği kaynak çözünürlüğüne göre (≥ 4 kaynak pikseli): düşük çözünürlüklü sayfa bölgelerinde gürültü uyarıları kalktı.
+- Gerçek sayfalar: kahve, örgü, sinema, cinephile, çay çalışıyor; saiki uyarı; ızgaralı kedi sayfası anlaşılır hata.
 
 ## Gözden geçirme (14 Ekim 2026)
 - Motor: 13/13 kahve kesimi G1, 6–12 anchor, düz segment yok, çizime giriş ≤ 0.09 mm; sticker başına 80–520 ms (Mac, node).

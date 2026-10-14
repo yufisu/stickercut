@@ -4,7 +4,7 @@ Sticker pack PNG'lerinden iki sayfalı baskı ve kesim PDF'i üretir. Gerçek ç
 
 ## Pack hazırlama
 
-1. Girdileri incele: aynı boyutta iki tasarım PNG'si (tam tasarım ve stickersız arka plan) ile şeffaf sticker PNG'leri gerekir. Sticker PNG'si eksikse sorun değil: eşleşmeyen çizimler tasarımdan kesilen *bölge öğesi* olur (`file: null`, `region` alanı).
+1. Girdileri incele: en iyisi aynı boyutta iki tasarım PNG'si (tam tasarım ve stickersız arka plan) ile şeffaf sticker PNG'leri. Sticker PNG'si eksikse eşleşmeyen çizimler tasarımdan kesilen *bölge öğesi* olur (`file: null`, `region` alanı). Klasörde yalnızca sticker sayfası varsa **tek sayfa modu** çalışır: arka plan sayfadan üretilip `<pack>.arkaplan.png` olarak yazılır (düz renk ya da şeffaf arka plan gerekir; desenliyse `SHEET_BUSY` hatası).
 2. `node bin/stickercut.mjs init "<klasör>" --page 80x140 --json` çalıştır. Klasörde birden çok pack varsa `--design`, `--background` ve `-o` ile açık yollar ver.
 3. Üretilen önizlemeyi görsel olarak kontrol et; `needsReview` öğelerini ve `REGION_ITEM` mesajlarını incele.
 4. `node bin/stickercut.mjs doctor "<pack.json>" --json` ile kalite raporunu al: her kesim G1 ve `lines: 0` olmalı; `MIN_GAP`, `PAGE_MARGIN`, `OVERLAP`, `TIGHT_SPOT` uyarılarını kullanıcıya bildir. Gerekirse `pack.json`'da `x`, `y`, `scale`, `rotationDeg`, `printOnly`, `overrides.*` düzelt ve `preview` ile tekrar bak.

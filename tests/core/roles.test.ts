@@ -52,5 +52,30 @@ describe('roles', () => {
     const r = assignRoles(stickerInputs);
     expect(r.ambiguous).toBe(true);
     expect(r.reason).toContain('bulunamadı');
+    expect(r.reason).toContain('Tam tasarım olarak seç');
+  });
+
+  describe('tek sayfa modu', () => {
+    it('tek opak PNG tam tasarım olur, arka plan yok, kestirim eklenir', () => {
+      const r = assignRoles([{ file: 'sayfa.png', raster: scene.design }]);
+      expect(r).toMatchObject({ design: 'sayfa.png', background: null, stickers: [], ambiguous: false, single: true });
+      expect(r.sheet?.kind).toBe('flat');
+    });
+    it('tek opak sayfa + şeffaf sticker’lar: sticker’lar eşleştirmeye gider', () => {
+      const r = assignRoles([{ file: 'sayfa.png', raster: scene.design }, ...stickerInputs]);
+      expect(r.single).toBe(true);
+      expect(r.stickers.sort()).toEqual(['baklava.png', 'cay.png', 'kahve.png', 'kullanilmayan.png']);
+    });
+    it('tek başına şeffaf sayfa da tam tasarım olur', () => {
+      const r = assignRoles([{ file: 'seffaf.png', raster: scene.stickers[0].raster }]);
+      expect(r).toMatchObject({ design: 'seffaf.png', background: null, stickers: [], single: true });
+    });
+    it('tasarım ipucunun eşi yoksa ya da arka plan istenmiyorsa tek sayfa', () => {
+      const other = background(500, 700);
+      expect(assignRoles([{ file: 'a.png', raster: scene.design }, { file: 'c.png', raster: other }], { design: 'a.png' }))
+        .toMatchObject({ design: 'a.png', background: null, single: true });
+      expect(assignRoles([{ file: 'a.png', raster: scene.design }, { file: 'b.png', raster: scene.background }], { design: 'a.png', noBackground: true }))
+        .toMatchObject({ design: 'a.png', background: null, single: true });
+    });
   });
 });

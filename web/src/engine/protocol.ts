@@ -27,6 +27,9 @@ export type Task =
   | { type: 'reset' };
 
 export interface FileInfo { name: string; width: number; height: number }
+/** Tek sayfa modunda sayfadan üretilen arka plan (raster olmadan; ana iş parçacığı bitmap'ini kendi üretir). */
+export interface SyntheticFile extends FileInfo { bytes: Uint8Array }
+export type InitReply = Omit<InitResult, 'syntheticBackground'> & { syntheticBackground?: SyntheticFile };
 export interface ReferenceInfo { name: string; cuts: Pt[][]; borders: Pt[][]; pageMm: { w: number; h: number }; cutPage: number; messages: Message[] }
 export interface CutStats { anchors: number; lines: number; ms: number; minMm: number }
 
@@ -34,7 +37,7 @@ export interface TaskResultMap {
   addFiles: FileInfo[];
   removeFiles: null;
   roles: RoleResult;
-  init: InitResult;
+  init: InitReply;
   cuts: { messages: Message[] };
   pdf: { pdf: Uint8Array | null; messages: Message[] };
   zip: Uint8Array;

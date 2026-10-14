@@ -82,11 +82,11 @@ describe('dosya aksiyonları', () => {
     expect(f.bitmap.close).toHaveBeenCalled();
   });
 
-  it('place: tasarım ve arka plan yoksa uyarır, varsa motoru çağırıp belgeyi açar', async () => {
-    store.files.value.get('background.png')!.role = 'ignore';
+  it('place: tam tasarım yoksa uyarır, varsa motoru çağırıp belgeyi açar', async () => {
+    store.files.value.get('design.png')!.role = 'ignore';
     expect(await place()).toBe(false);
     expect(engine.init).not.toHaveBeenCalled();
-    store.files.value.get('background.png')!.role = 'background';
+    store.files.value.get('design.png')!.role = 'design';
     const pack = {
       version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
       files: { design: 'design.png', background: 'background.png' }, defaults: {} as never,
@@ -96,6 +96,38 @@ describe('dosya aksiyonları', () => {
     expect(await place()).toBe(true);
     expect(store.doc.value?.items).toHaveLength(1);
     expect(engine.cuts).toHaveBeenCalled();
+  });
+
+  it('place: arka plan yoksa tek sayfa modunda çalışır ve üretilen arka planı mağazaya ekler', async () => {
+    store.files.value = new Map([['sayfa.png', entry('sayfa.png', 'design')]]);
+    const pack = {
+      version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
+      files: { design: 'sayfa.png', background: 'otomatik arka plan.png' }, defaults: {} as never, items: [],
+    };
+    vi.mocked(engine.init).mockResolvedValue({
+      pack, roles: { design: 'sayfa.png', background: null, stickers: [], ambiguous: false, single: true }, unmatchedRegions: [],
+      messages: [{ level: 'info', code: 'SINGLE_SHEET', text: '…' }],
+      syntheticBackground: { name: 'otomatik arka plan.png', bytes: new Uint8Array([9]), width: 100, height: 100 },
+    } as never);
+    expect(await place()).toBe(true);
+    expect(vi.mocked(engine.init).mock.calls.at(-1)![0]).toMatchObject({ design: 'sayfa.png', background: null });
+    const bg = store.files.value.get('otomatik arka plan.png');
+    expect(bg).toMatchObject({ role: 'background', width: 100, height: 100 });
+    expect(store.files.value.get('sayfa.png')!.role).toBe('design');
+    expect(store.doc.value?.files.background).toBe('otomatik arka plan.png');
+    expect(storage.saveFiles).toHaveBeenCalled();
+  });
+
+  it('addFiles tek sayfa kestirimini kurulum ekranı için saklar', async () => {
+    store.files.value = new Map();
+    vi.mocked(engine.roles).mockResolvedValueOnce({
+      design: 'sayfa.png', background: null, stickers: [], ambiguous: false, single: true,
+      sheet: { kind: 'flat', rgb: [200, 220, 140], transparentRatio: 0, coverage: 0.7, edgeCoverage: 0.98 },
+    });
+    await addFiles([file('sayfa.png')]);
+    expect(store.files.value.get('sayfa.png')!.role).toBe('design');
+    expect(store.sheetHint.value).toMatchObject({ file: 'sayfa.png', kind: 'flat', rgb: [200, 220, 140] });
+    expect(store.notice.value).toBeNull();
   });
 
   it('newProject bekleyen kaydı bitirir, depoyu temizler ve mağazayı sıfırlar', async () => {

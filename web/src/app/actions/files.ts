@@ -51,6 +51,17 @@ function autoRoles(roles: { design: string | null; background: string | null; st
   store.files.value = next;
 }
 
+/** Worker'ın zaten bildiği bir dosyayı (ör. sayfadan üretilen arka plan) mağazaya ekler ve kaydeder. */
+export async function adoptFile(name: string, bytes: Uint8Array, width: number, height: number, role: Role): Promise<void> {
+  const { bitmap, thumb } = await makeBitmaps(bytes);
+  const next = new Map(store.files.value);
+  const old = next.get(name);
+  old?.bitmap.close(); old?.thumb.close();
+  next.set(name, { name, bytes, width, height, bitmap, thumb, role });
+  store.files.value = next;
+  saveFilesNow();
+}
+
 /** Kurulum ekranı: PNG'leri (veya bir proje .zip'ini) ekle. */
 export async function addFiles(list: File[]): Promise<void> {
   if (busy.value) return;
@@ -65,6 +76,7 @@ export async function addFiles(list: File[]): Promise<void> {
     const roles = await engine.roles();
     batch(() => {
       autoRoles(roles, store.rolesLocked.value ? new Set(entries.map((e) => nfc(e.name))) : null);
+      store.sheetHint.value = roles.single && roles.design && roles.sheet ? { file: roles.design, ...roles.sheet } : null;
       store.notice.value = roles.reason && !store.rolesLocked.value ? { level: 'warning', code: 'ROLES', text: roles.reason } : null;
     });
     if (generic.length) toast('Fotoğraflar\'dan gelen dosyalar yeniden adlandırılmış (IMG_…). Rolleri elle kontrol et.', 'warning');
@@ -143,7 +155,7 @@ export async function newProject(): Promise<void> {
       store.files.value = new Map(); store.doc.value = null; store.cuts.clear(); store.cutsVersion.value++;
       store.initMessages.value = []; store.cutMessages.value = []; store.selection.value = new Set();
       store.pageSetup.value = { widthMm: 80, heightMm: null }; store.presetId.value = 'snug'; store.dismissedMarkers.value = new Set();
-      store.rolesLocked.value = false; store.notice.value = null; store.reference.value = null; store.compare.value = null;
+      store.rolesLocked.value = false; store.sheetHint.value = null; store.notice.value = null; store.reference.value = null; store.compare.value = null;
     });
   });
 }

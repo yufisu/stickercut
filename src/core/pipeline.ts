@@ -5,7 +5,8 @@ import {
   type Pack, type Item, type Settings, DEFAULT_SETTINGS, effectiveSettings, mmPerDesignPx, nfc, isRegionItem, itemLabel,
 } from './project';
 import { type RoleResult, assignRoles, transparencyRatio } from './roles';
-import { type MatchOptions, type MatchProgress, matchStickersSteps } from './match';
+import { type MatchOptions, type MatchProgress, DEFAULT_MATCH_OPTIONS, matchStickersSteps } from './match';
+import { analyzeSheet, eraseRegions, encodeRasterAt, hexOf, type SheetAnalysis } from './sheet';
 import { cloneRaster, compositeOverWhite, downscaleRaster, drawRaster, strokePolyline, createRaster } from './render';
 import { checkLayout } from './checks';
 import { unmatchedRegionText } from './region-label';
@@ -21,14 +22,24 @@ export type Level = 'error' | 'warning' | 'info';
 export interface Message { level: Level; code: string; text: string; itemId?: string; file?: string; region?: BBox; marker?: number }
 export interface InitOptions {
   design?: string;
-  background?: string;
+  /** null: arka plan dosyası yok; tek sayfa modunda arka plan tasarımdan üretilir. */
+  background?: string | null;
   stickers?: string[];
   page?: { widthMm: number; heightMm?: number };
   match?: Partial<MatchOptions>;
   /** Eşleşmeyen tasarım bölgelerini PNG'siz kesim öğesi yap (varsayılan: açık). */
   regionItems?: boolean;
+  /** Tek sayfa modunda üretilen arka plan dosyasının adı (varsayılan "otomatik arka plan.png"). */
+  syntheticBackgroundName?: string;
 }
-export interface InitResult { pack: Pack | null; roles: RoleResult; unmatchedRegions: BBox[]; messages: Message[] }
+export interface InitResult {
+  pack: Pack | null;
+  roles: RoleResult;
+  unmatchedRegions: BBox[];
+  messages: Message[];
+  /** Tek sayfa modunda tasarımdan üretilen sticker'sız arka plan; çağıran kaydetmeli (pack.files.background). */
+  syntheticBackground?: LoadedFile;
+}
 export type CutCache = Map<string, CutShape>;
 export const createCutCache = (): CutCache => new Map();
 
@@ -67,20 +78,40 @@ export function* initPackSteps(files: LoadedFile[], opts: InitOptions = {}): Gen
   const byName = new Map(files.map((f) => [f.name, f]));
   const roles = assignRoles(files.map((f) => ({ file: f.name, raster: f.raster })), {
     design: opts.design && nfc(opts.design),
-    background: opts.background && nfc(opts.background),
+    background: opts.background ? nfc(opts.background) : undefined,
+    noBackground: opts.background === null,
   });
-  const fail = (text: string): InitResult => ({ pack: null, roles, unmatchedRegions: [], messages: [{ level: 'error', code: 'ROLES', text }] });
-  if (!roles.design || !roles.background) return fail(roles.reason ?? 'Tam tasarım ve arka plan belirlenemedi.');
-  const design = byName.get(roles.design), background = byName.get(roles.background);
+  const fail = (text: string, code = 'ROLES'): InitResult => ({ pack: null, roles, unmatchedRegions: [], messages: [{ level: 'error', code, text }] });
+  if (!roles.design) return fail(roles.reason ?? 'Tam tasarım belirlenemedi.');
+  const design = byName.get(roles.design);
   if (!design) return fail(`Tam tasarım dosyası bulunamadı: ${roles.design}`);
-  if (!background) return fail(`Arka plan dosyası bulunamadı: ${roles.background}`);
+  const messages: Message[] = [];
+  let background: LoadedFile | undefined, syntheticBackground: LoadedFile | undefined;
+  if (roles.background) {
+    background = byName.get(roles.background);
+    if (!background) return fail(`Arka plan dosyası bulunamadı: ${roles.background}`);
+  } else if (roles.single) {
+    yield { phase: 'regions', done: 0, total: 1 };
+    const tolerance = opts.match?.diffThreshold ?? DEFAULT_MATCH_OPTIONS.diffThreshold;
+    const sheet = analyzeSheet(design.raster, { minAreaRatio: opts.match?.minAreaRatio ?? DEFAULT_MATCH_OPTIONS.minAreaRatio, tolerance });
+    if (sheet.verdict === 'busy') {
+      return fail('Arka planda desen ya da çizim var; sticker\'lar ayrılamadı. Sticker\'sız arka plan PNG\'sini de yükle ya da sayfayı şeffaf arka planla dışa aktar.', 'SHEET_BUSY');
+    }
+    const raster = eraseRegions(design.raster, sheet, tolerance);
+    let name = nfc(opts.syntheticBackgroundName ?? 'otomatik arka plan.png');
+    for (let n = 2; byName.has(name); n++) name = name.replace(/( \d+)?(\.png)$/i, ` ${n}$2`);
+    syntheticBackground = { name, bytes: encodeRasterAt(raster, design.width, design.height), width: design.width, height: design.height, raster };
+    background = syntheticBackground;
+    byName.set(name, syntheticBackground);
+    messages.push(...sheetMessages(sheet));
+  } else return fail(roles.reason ?? 'Tam tasarım ve arka plan belirlenemedi.');
 
   const stickerFiles = (opts.stickers?.map(nfc) ?? roles.stickers)
+    .filter((n) => n !== design.name && n !== background.name)
     .map((n) => byName.get(n))
     .filter((f): f is LoadedFile => f !== undefined);
   const result = yield* matchStickersSteps(design.raster, background.raster, stickerFiles.map((f) => ({ file: f.name, raster: f.raster })), opts.match);
 
-  const messages: Message[] = [];
   const widthMm = opts.page?.widthMm ?? 80;
   const heightMm = opts.page?.heightMm ?? round((widthMm * design.height) / design.width, 1);
   if (!opts.page) {
@@ -142,10 +173,36 @@ export function* initPackSteps(files: LoadedFile[], opts: InitOptions = {}): Gen
       x: round(b.x + b.w / 2, 2), y: round(b.y + b.h / 2, 2), scale: 1, rotationDeg: 0,
       printOnly: false, needsReview: ambiguous, matchScore: null, overrides: {},
     });
-    messages.push({ level: ambiguous ? 'warning' : 'info', code: 'REGION_ITEM', itemId: id, region: b, marker,
-      text: regionItemText(b, design.width, design.height, marker, ambiguous) });
+    // PNG'si verilmeyen çizim belirsizdir; sticker hiç verilmediyse her bölge beklenen sonuçtur, tek özet yeter.
+    if (ambiguous) {
+      messages.push({ level: 'warning', code: 'REGION_ITEM', itemId: id, region: b, marker,
+        text: regionItemText(b, design.width, design.height, marker, true) });
+    }
   }
-  return { pack, roles, unmatchedRegions, messages };
+  const regionCount = pack.items.filter(isRegionItem).length;
+  if (regionCount && !stickerFiles.length && !syntheticBackground) {
+    messages.push({ level: 'info', code: 'REGION_ITEMS', text: `${regionCount} çizim tasarımdan bölge olarak kesildi.` });
+  }
+  return { pack, roles, unmatchedRegions, messages, ...(syntheticBackground ? { syntheticBackground } : {}) };
+}
+
+function sheetMessages(sheet: SheetAnalysis): Message[] {
+  const out: Message[] = [];
+  const n = sheet.regions.length;
+  const basis = sheet.background.kind === 'transparent'
+    ? 'tasarımın şeffaf alanları arka plan sayılarak'
+    : `tasarımın düz arka planı (${hexOf(sheet.background.rgb)}) temel alınarak`;
+  out.push({ level: 'info', code: 'SINGLE_SHEET',
+    text: `Arka plan dosyası yoktu; ${basis} ${n} şekil bulundu. Yazı ve süsler de şekil sayılmış olabilir; kesilmesin istediklerini "sadece baskı" yap, silme (silinen şekil baskıdan da kalkar).` });
+  if (sheet.kept.length) {
+    out.push({ level: 'info', code: 'SHEET_KEPT',
+      text: `Sayfa kenarına dayanan ${sheet.kept.length} alan (başlık bandı, çerçeve, köşe süsü gibi) arka planda bırakıldı; bunlar baskıda kalır ama kesilmez.` });
+  }
+  if (sheet.verdict === 'warn') {
+    out.push({ level: 'warning', code: 'SHEET_BUSY',
+      text: 'Arka plan tam düz değil; bazı sticker\'lar birleşmiş ya da eksik olabilir. En iyi sonuç için sticker\'sız arka plan PNG\'sini de yükle.' });
+  }
+  return out;
 }
 
 /** Maskeyi en yakın komşu örneklemeyle w×h boyutuna getirir (küçültülmüş analiz rasteri → tasarım px). */
@@ -264,7 +321,10 @@ export function* cutSteps(pack: Pack, assets: Map<string, Asset>, cache: CutCach
     details.set(item.id, detail);
     yield { itemId: item.id, points, detail };
     const c = shape.clearance;
-    if (o.tightMm > 0 && c.worst && c.minMm < Math.min(o.offsetMm, o.tightMm) - 0.1) {
+    // Kaynak çözünürlüğünün çözemeyeceği (≈4 kaynak pikseli) sapmalar uyarı değildir: düşük çözünürlüklü
+    // sayfadan kesilen bölgelerde köşe yumuşatması birkaç piksel içeri düşer, baskıda fark edilmez.
+    const slack = Math.max(0.1, 4 / o.pxPerMm);
+    if (o.tightMm > 0 && c.worst && c.minMm < Math.min(o.offsetMm, o.tightMm) - slack) {
       const p = apply(m, c.worst), r = 2 / mm.x;
       const region: BBox = { x: Math.round(p.x - r), y: Math.round(p.y - r), w: Math.round(2 * r), h: Math.round(2 * r) };
       messages.push({ level: 'warning', code: 'TIGHT_SPOT', itemId: item.id, file: item.file ?? undefined, region,
