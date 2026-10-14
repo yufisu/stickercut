@@ -121,7 +121,14 @@ export function Stage() {
       onPlace: (at, screen) => setAddAt({ at, screen: { x: screen.x, y: Math.min(screen.y, el.clientHeight - 160) } }),
     });
 
-    const fit = () => { store.camera.value = fitCamera(viewport(), page(), 28); };
+    /** Sığdır: kompakt düzende alt sayfanın kapattığı alanı hesaba kat. */
+    const fit = () => {
+      const vp = viewport();
+      const sheet = el.parentElement?.querySelector<HTMLElement>('.sheet');
+      const covered = sheet ? Math.min(vp.height * 0.6, sheet.getBoundingClientRect().height) : 0;
+      const cam = fitCamera({ width: vp.width, height: vp.height - covered }, page(), 28);
+      store.camera.value = { ...cam, panY: cam.panY - covered / 2 };
+    };
     const boundsMm = (ids: Iterable<string>) => {
       const doc = store.doc.value!, mm = mmPerDesignPx(doc);
       const bs = doc.items.filter((i) => new Set(ids).has(i.id)).map(itemBounds).filter((b): b is NonNullable<typeof b> => !!b);
@@ -230,7 +237,7 @@ export function Stage() {
         <Segmented<ViewMode> value={mode} ariaLabel="Görünüm" onChange={(v) => { store.viewMode.value = v; }}
           options={[{ value: 'edit', label: 'Düzenle', title: '⌥1' }, { value: 'cut', label: 'Kesim sayfası', title: '⌥2' }, { value: 'print', label: 'Baskı önizleme', title: '⌥3' }]} />
         <span class="spacer" />
-        {busy.value ? null : <span class="small muted wide-only">{mode === 'edit' ? `Sürükle: taşı · köşe: ölçek · üst tutamaç: döndür · ${MOD}+kaydır: yakınlaştır` : mode === 'cut' ? 'Baskıcının göreceği kesim sayfası' : 'Beyaz kenarlarla baskı sayfası'}</span>}
+        {busy.value || mode === 'edit' ? null : <span class="small muted wide-only" style={{ background: 'var(--panel)', padding: '3px 8px', borderRadius: 6 }}>{mode === 'cut' ? 'Baskıcının göreceği kesim sayfası' : 'Beyaz kenarlarla baskı sayfası'}</span>}
       </div>
       <div class="stage-bottom" style={{ left: rulers ? 30 : 12 }}>
         <div class="floating" role="group" aria-label="Yakınlaştırma">

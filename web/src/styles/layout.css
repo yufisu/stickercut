@@ -153,3 +153,10 @@
 .export-foot { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); }
 .export-foot .btn.block { flex: 1; }
 .sheet { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+
+/* Alt sayfa: peek'te yalnızca tutamaç + dışa aktarma çubuğu */
+@media (max-width: 1100px) {
+  .sheet[data-detent="peek"] { height: 84px; }
+  .sheet[data-detent="peek"] .tabs, .sheet[data-detent="peek"] .inspector { display: none; }
+  .sheet .export-foot { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+}
