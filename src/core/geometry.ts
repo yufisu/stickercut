@@ -60,11 +60,13 @@ export function closedPathSvg(pts: Pt[]): string {
 
 const midpoint = (a: Coord, b: Coord): Coord => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-function segmentDistanceSquared(p: Coord, a: Coord, b: Coord): number {
+/** Squared distance from p to the segment a–b. */
+export function pointSegmentDistanceSquared(p: Coord, a: Coord, b: Coord): number {
   const dx = b.x - a.x, dy = b.y - a.y, lengthSquared = dx * dx + dy * dy;
   const t = lengthSquared ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared)) : 0;
   return (p.x - a.x - t * dx) ** 2 + (p.y - a.y - t * dy) ** 2;
 }
+const segmentDistanceSquared = pointSegmentDistanceSquared;
 
 /** Adaptive subdivision in path units, including the closing cubic when closed. */
 export function flattenPath(pts: Pt[], closed: boolean, tolerance = 0.25): Pt[] {
@@ -93,6 +95,26 @@ export function flattenPath(pts: Pt[], closed: boolean, tolerance = 0.25): Pt[] 
 
 export function flattenClosedPath(pts: Pt[], tolerance = 0.25): Pt[] {
   return flattenPath(pts, true, tolerance);
+}
+
+/** Shoelace area of the flattened closed path (absolute, path units²). */
+export function polygonArea(pts: Pt[], tolerance = 0.25): number {
+  const flat = flattenPath(pts, true, tolerance);
+  let sum = 0;
+  for (let i = 0, j = flat.length - 1; i < flat.length; j = i++) sum += flat[j].x * flat[i].y - flat[i].x * flat[j].y;
+  return Math.abs(sum) / 2;
+}
+
+/** Length of the flattened path, including the closing segment when closed. */
+export function polylineLength(pts: Pt[], closed = true, tolerance = 0.25): number {
+  const flat = flattenPath(pts, closed, tolerance);
+  let length = 0;
+  const count = closed ? flat.length : flat.length - 1;
+  for (let i = 0; i < count; i++) {
+    const a = flat[i], b = flat[(i + 1) % flat.length];
+    length += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return length;
 }
 
 function cubicAt(a: number, c1: number, c2: number, b: number, t: number): number {
