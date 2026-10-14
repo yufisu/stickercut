@@ -9,7 +9,8 @@ import { type MatchOptions, matchStickers } from './match';
 import { cloneRaster, compositeOverWhite, downscaleRaster, drawRaster, strokePolyline, createRaster } from './render';
 import { checkLayout } from './checks';
 import { regionLocation, unmatchedRegionText } from './region-label';
-import { buildPdf, type PdfAsset } from './pdf';
+import { buildPdf, type PdfAsset, type BuildPdfOptions } from './pdf';
+import { comparePaths, type CompareOptions, type CompareResult } from './compare';
 import { encodeRle, decodeRle } from './shape';
 
 export interface Asset { width: number; height: number; raster: Raster }
@@ -312,10 +313,8 @@ export function packAssetNames(pack: Pack, withDesign = false): string[] {
   return [...new Set(names)];
 }
 
-export async function buildPackPdf(
-  pack: Pack, files: Map<string, LoadedFile>, cache?: CutCache,
-): Promise<{ pdf: Uint8Array | null; messages: Message[] }> {
-  const { cuts, messages } = computeCuts(pack, files, cache);
+/** Dışa aktarma için PDF varlıkları; eksik arka plan/tasarım hata mesajı üretir. */
+export function pdfAssetsFor(pack: Pack, files: Map<string, LoadedFile>, messages: Message[]): Map<string, PdfAsset> {
   const assets = new Map<string, PdfAsset>();
   for (const name of packAssetNames(pack)) {
     const f = files.get(name);
@@ -326,6 +325,23 @@ export async function buildPackPdf(
       messages.push({ level: 'error', code: 'MISSING_FILE', file: name, text: `Tam tasarım dosyası "${name}" projede yok; bölge öğeleri için gerekli.` });
     }
   }
-  if (messages.some((m) => m.level === 'error')) return { pdf: null, messages };
-  return { pdf: await buildPdf({ pack, assets, cuts }), messages };
+  return assets;
+}
+
+export async function buildPackPdf(
+  pack: Pack, files: Map<string, LoadedFile>, cache?: CutCache, opts?: BuildPdfOptions,
+): Promise<{ pdf: Uint8Array | null; messages: Message[]; cuts: Map<string, Pt[]> }> {
+  const { cuts, messages } = computeCuts(pack, files, cache);
+  const assets = pdfAssetsFor(pack, files, messages);
+  if (messages.some((m) => m.level === 'error')) return { pdf: null, messages, cuts };
+  return { pdf: await buildPdf({ pack, assets, cuts }, opts), messages, cuts };
+}
+
+/** Kesimleri hesaplayıp referans (Illustrator) yollarıyla karşılaştırır. */
+export function compareWithReference(
+  pack: Pack, files: Map<string, Asset>, ref: { cuts: Pt[][] }, cache?: CutCache, opts?: CompareOptions,
+): { result: CompareResult; messages: Message[] } {
+  const { cuts, messages } = computeCuts(pack, files, cache);
+  const result = comparePaths(pack, cuts, ref.cuts, opts);
+  return { result, messages: [...messages, ...result.messages] };
 }

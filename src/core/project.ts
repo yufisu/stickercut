@@ -180,6 +180,9 @@ export function parsePack(text: string): Pack {
       } else region = { bbox: { x: b.x, y: b.y, w: b.w, h: b.h }, rle: r.rle };
     } else if (typeof o.file !== 'string') problems.push(`items[${i}].file bir dosya adı olmalı`);
     for (const k of ['x', 'y', 'scale'] as const) if (!isNum(o[k])) problems.push(`items[${i}].${k} sayı olmalı`);
+    if (typeof o.id === 'string' && o.id !== '' && !/^[A-Za-z0-9_-]{1,64}$/.test(o.id)) {
+      problems.push(`items[${i}].id yalnızca harf, rakam, "-" ve "_" içerebilir`);
+    }
     return {
       id: typeof o.id === 'string' ? o.id : '',
       file: o.file === null ? null : nfc(String(o.file ?? '')),

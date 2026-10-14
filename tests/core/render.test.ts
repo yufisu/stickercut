@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createRaster, compositeOverWhite, drawRaster, downscaleRaster, strokePolyline,
+  createRaster, compositeOverWhite, drawRaster, downscaleRaster, strokePolyline, coverageMask, applyCoverage, fillCoverage,
 } from '../../src/core/render';
 import { itemMatrix } from '../../src/core/geometry';
 
@@ -38,5 +38,25 @@ describe('render', () => {
     strokePolyline(r, [{ x: 2, y: 10 }, { x: 18, y: 10 }], false, [255, 0, 0], 2);
     expect(px(r, 10, 10)).toEqual([255, 0, 0, 255]);
     expect(px(r, 10, 15)[3]).toBe(0);
+  });
+
+  it('coverageMask kare içini doldurur, yarım örtülen kenar pikseli ara değer alır', () => {
+    const cov = coverageMask(4, 4, [{ x: 1, y: 1 }, { x: 3.5, y: 1 }, { x: 3.5, y: 3 }, { x: 1, y: 3 }]);
+    expect(cov[1 * 4 + 1]).toBe(255); // tamamen içeride
+    expect(cov[1 * 4 + 3]).toBe(128); // x 3–4: yarısı içeride
+    expect(cov[0]).toBe(0);
+    expect(cov[3 * 4 + 1]).toBe(0);   // y 3–4 dışarıda
+    expect([...coverageMask(2, 2, [{ x: 0, y: 0 }, { x: 2, y: 2 }])]).toEqual([0, 0, 0, 0]); // çokgen değil
+  });
+
+  it('fillCoverage ve applyCoverage alfayı kapsamaya göre işler', () => {
+    const r = createRaster(2, 1);
+    r.data.set([0, 0, 0, 255], 0); // siyah opak, ikinci piksel boş
+    fillCoverage(r, new Uint8Array([255, 128]), [255, 255, 255]);
+    expect(px(r, 0, 0)).toEqual([255, 255, 255, 255]);
+    expect(px(r, 1, 0)).toEqual([255, 255, 255, 128]);
+    applyCoverage(r, new Uint8Array([51, 0]));
+    expect(px(r, 0, 0)[3]).toBe(51);
+    expect(px(r, 1, 0)[3]).toBe(0);
   });
 });

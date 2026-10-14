@@ -14,6 +14,7 @@ export interface CompareOptions {
   searchMm?: number;   // aday eşleme için en büyük uzaklık (8)
 }
 const DEFAULTS: Required<CompareOptions> = { sampleMm: 0.2, coarseMm: 1, flattenMm: 0.05, meanMm: 0.25, maxMm: 0.8, searchMm: 8 };
+const definedOnly = (opts: CompareOptions): CompareOptions => Object.fromEntries(Object.entries(opts).filter(([, v]) => v !== undefined)) as CompareOptions;
 
 export type Verdict = 'eşleşiyor' | 'sapıyor' | 'eşleşme yok';
 export interface PathStats { anchors: number; curves: number; lines: number; lengthMm: number; areaMm2: number; bboxMm: { minX: number; minY: number; maxX: number; maxY: number } }
@@ -92,7 +93,7 @@ function distance(a: Shape, b: Shape, fine: boolean): { meanMm: number; hausdorf
 }
 
 export function pathDistance(aMm: Pt[], bMm: Pt[], opts: CompareOptions = {}): { meanMm: number; hausdorffMm: number; signedMeanMm: number } {
-  const o = { ...DEFAULTS, ...opts };
+  const o = { ...DEFAULTS, ...definedOnly(opts) };
   return distance(prepare(aMm, o), prepare(bMm, o), true);
 }
 
@@ -109,7 +110,7 @@ function median(values: number[]): number | null {
 const fmt = (v: number) => String(Math.round(v * 100) / 100);
 
 export function comparePaths(pack: Pack, cuts: Map<string, Pt[]>, refs: Pt[][], opts: CompareOptions = {}): CompareResult {
-  const o = { ...DEFAULTS, ...opts };
+  const o = { ...DEFAULTS, ...definedOnly(opts) };
   const mm = mmPerDesignPx(pack);
   const toMm: Affine = [mm.x, 0, 0, mm.y, 0, 0];
   const files = new Map(pack.items.map((i) => [i.id, i.file]));

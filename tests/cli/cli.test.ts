@@ -77,6 +77,58 @@ describe('cli', () => {
     expect(await run(['init', dir, '--design', 'bases/turk kahvesi.png', '--background', 'bases/turk kahvesi arka.png'], io)).toBe(0);
   });
 
+  it('build dışa aktarma bayrakları: svg, png klasörü, paket, spot renk, yalnızca kesim', async () => {
+    await run(['init', dir, '--page', '80x120'], io);
+    const pack = join(dir, 'pack.json'), pngDir = join(dir, 'mockup');
+    lines = [];
+    expect(await run(['build', pack, '--svg', '--print-svg', '--png-dir', pngDir, '--dpi', '72', '--package', '--spot', '--json'], io)).toBe(0);
+    const out = JSON.parse(lines.join('\n'));
+    expect(existsSync(out.svgPath)).toBe(true);
+    expect(readFileSync(out.svgPath, 'utf8')).toContain('<svg');
+    expect(existsSync(out.printSvgPath)).toBe(true);
+    expect(out.pngs.length).toBe(4);
+    expect(out.pngs.every((p: string) => existsSync(p))).toBe(true);
+    expect(existsSync(out.packagePath)).toBe(true);
+    expect(out.options.spotColor).toBe(true);
+    expect(await run(['build', pack, '--cut-only', '--no-layers', '-o', join(dir, 'kesim.pdf')], io)).toBe(0);
+    expect((await PDFDocument.load(readFileSync(join(dir, 'kesim.pdf')))).getPageCount()).toBe(1);
+  });
+
+  it('compare kendi PDF’iyle eşleşir, 2 mm kaydırınca sapar', async () => {
+    await run(['init', dir, '--page', '80x120'], io);
+    const pack = join(dir, 'pack.json');
+    expect(await run(['build', pack], io)).toBe(0);
+    lines = [];
+    expect(await run(['compare', pack, join(dir, 'pack.pdf'), '--json'], io)).toBe(0);
+    const out = JSON.parse(lines.join('\n'));
+    expect(out.cutPage).toBe(2);
+    expect(out.summary.matched).toBe(out.summary.items);
+    expect(out.items.every((i: { verdict: string }) => i.verdict === 'eşleşiyor')).toBe(true);
+    const moved = JSON.parse(readFileSync(pack, 'utf8'));
+    moved.items[0].x += 20; // 2 mm
+    writeFileSync(pack, JSON.stringify(moved));
+    lines = [];
+    expect(await run(['compare', pack, join(dir, 'pack.pdf'), '--json'], io)).toBe(1);
+    expect(JSON.parse(lines.join('\n')).items.find((i: { itemId: string }) => i.itemId === 'i1').verdict).toBe('sapıyor');
+  });
+
+  it('doctor rapor verir; eksik dosyada 1, --strict ile uyarıda 1 döner', async () => {
+    await run(['init', dir, '--page', '80x120'], io);
+    const pack = join(dir, 'pack.json');
+    lines = [];
+    expect(await run(['doctor', pack, '--json'], io)).toBe(0);
+    const out = JSON.parse(lines.join('\n'));
+    expect(out.items).toHaveLength(4);
+    expect(out.items.every((i: { g1: boolean; lines: number }) => i.g1 && i.lines === 0)).toBe(true);
+    const broken = JSON.parse(readFileSync(pack, 'utf8'));
+    broken.items[1].file = 'assets/yok.png';
+    writeFileSync(pack, JSON.stringify(broken));
+    expect(await run(['doctor', pack], io)).toBe(1);
+    expect(lines.join('\n')).toContain('HATA');
+    await run(['init', dir, '--page', '80x120'], io);
+    expect(await run(['doctor', pack, '--margin', '60', '--strict'], io)).toBe(1); // 60 mm kenar payı her şeyi uyarır
+  });
+
   it('bilinmeyen komut kullanım metni ve 2 döner', async () => {
     expect(await run(['yok'], io)).toBe(2);
     expect(lines.join('\n')).toContain('Kullanım');

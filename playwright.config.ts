@@ -2,7 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  timeout: 120_000,
+  timeout: 180_000,
+  expect: { timeout: 30_000 }, // ilk yüklemede Vite worker derlemesi + PNG çözme birkaç saniye sürebilir
   fullyParallel: false,
   workers: 1,
   retries: 0,

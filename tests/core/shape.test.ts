@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createMask, maskArea, labelComponents, type Mask } from '../../src/core/raster';
 import { signedDistance, squaredDistance, closeMask, openMask } from '../../src/core/distance';
 import {
-  coverageMask, selectParts, bridgeParts, traceCrack, isoContour, roundedRect, encodeRle, decodeRle,
+  alphaCoverage, selectParts, bridgeParts, traceCrack, isoContour, roundedRect, encodeRle, decodeRle,
 } from '../../src/core/shape';
 import { flattenClosedPath, polygonBounds, type Pt } from '../../src/core/geometry';
 import { paint } from '../helpers/scene';
@@ -62,16 +62,16 @@ describe('distance alanları', () => {
   });
 });
 
-describe('coverageMask', () => {
+describe('alphaCoverage', () => {
   it('f=1 ve pad=0 iken alphaMask ile aynı', () => {
     const r = paint(10, 10, (x, y) => (x < 5 ? [0, 0, 0, 255] : y < 3 ? [0, 0, 0, 100] : null));
-    const m = coverageMask(r, 128, 1, 0);
+    const m = alphaCoverage(r, 128, 1, 0);
     expect(m.width).toBe(10);
     expect(maskArea(m)).toBe(50);
   });
   it('küçültürken blok ortalamasını eşikler ve pad ekler', () => {
     const r = paint(100, 100, (x, y) => (x < 50 ? [0, 0, 0, 255] : null));
-    const m = coverageMask(r, 128, 0.1, 3);
+    const m = alphaCoverage(r, 128, 0.1, 3);
     expect([m.width, m.height]).toEqual([16, 16]);
     expect(maskArea(m)).toBe(50);
     expect(m.data[3 * 16 + 3]).toBe(1);

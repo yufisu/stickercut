@@ -1,7 +1,7 @@
 import { type Mask, type Raster, fillHoles, largestComponent, labelComponents, maskArea } from './raster';
 import { signedDistance, thresholdField, closeMask, squaredDistance } from './distance';
 import {
-  coverageMask, coverageFromMask, selectParts, bridgeParts, isoContour, roundedRect, maskOutline, decodeRle,
+  alphaCoverage, coverageFromMask, selectParts, bridgeParts, isoContour, roundedRect, maskOutline, decodeRle,
 } from './shape';
 import { transformPoints, flattenClosedPath, type Pt, type Affine } from './geometry';
 import type { RegionSource } from './project';
@@ -265,7 +265,7 @@ export function stickerCutShape(r: Raster, o: CutShapeOptions): CutShape {
   const started = performance.now();
   if (isFullyOpaque(r)) return rectShape(r.width, r.height, o, started);
   const grid = workGrid(Math.max(r.width, r.height), o);
-  const m0 = coverageMask(r, o.alphaThreshold, grid.f, grid.padPx);
+  const m0 = alphaCoverage(r, o.alphaThreshold, grid.f, grid.padPx);
   return toSource(cutFromWork(m0, grid, o, started), grid);
 }
 

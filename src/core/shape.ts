@@ -8,7 +8,7 @@ import type { Pt } from './geometry';
  */
 
 /** Alfa kanalını f oranında kutu filtreyle küçültür; blok ortalaması eşiği geçen pikseller dolu olur. Çevresine pad ekler. */
-export function coverageMask(r: Raster, threshold: number, f: number, pad: number): Mask {
+export function alphaCoverage(r: Raster, threshold: number, f: number, pad: number): Mask {
   const w2 = Math.max(1, Math.round(r.width * f)), h2 = Math.max(1, Math.round(r.height * f));
   const out = createMask(w2 + 2 * pad, h2 + 2 * pad);
   const sx = r.width / w2, sy = r.height / h2;

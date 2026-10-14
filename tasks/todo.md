@@ -4,23 +4,24 @@ Plan: `~/.claude/plans/noble-finding-aho.md` (onaylandı, 14 Ekim 2026). Kararla
 
 ## Faz 0 — Araç zinciri
 - [x] tasks/todo.md + tasks/lessons.md
-- [ ] preact, @preact/signals, @playwright/test; JSX ayarı (tsconfig + vite)
-- [ ] Playwright smoke (mevcut UI'a karşı), `npm run test:e2e`
+- [x] preact, @preact/signals, @playwright/test; JSX ayarı (tsconfig + vite)
+- [ ] Playwright smoke (mevcut UI'a karşı), `npm run test:e2e` — yazıldı, ilk koşuda zaman aşımı; expect süresi artırıldı, tekrar koşuyor
 
 ## Faz 1 — Kesim motoru v2
-- [ ] distance.ts: signedDistance / thresholdField / closeMask / openMask (Float32)
-- [ ] shape.ts: coverageMask, selectParts, bridgeParts, traceCrack, isoContour, roundedRect, RLE, regionOutline + testler
-- [ ] spline.ts: resample, gaussian, tangents, detectCorners, fitG1Closed, isG1 + testler
-- [ ] contour.ts: mm seçenekleri, pipeline sırası, clearance; contour testleri
-- [ ] project.ts v2 ayarlar + migrasyon; pipeline createCutCache + mesajlar; CLI bayrakları
-- [ ] Bölge öğeleri (file null + region rle), initPack REGION_ITEM, pdf clip, preview
-- [ ] checks.ts: MIN_GAP / OVERLAP (eğri) / PAGE_MARGIN; cut-stats script; gerçek pack iddiaları
+- [x] distance.ts: signedDistance / thresholdField / closeMask / openMask (Float32)
+- [x] shape.ts: alphaCoverage, selectParts, bridgeParts, traceCrack, isoContour, roundedRect, RLE, regionOutline + testler
+- [x] spline.ts: resample, gaussian, tangents, detectCorners, fitG1Closed, isG1 + testler
+- [x] contour.ts: mm seçenekleri, pipeline sırası, clearance; contour testleri
+- [x] project.ts v2 ayarlar + migrasyon; pipeline createCutCache + mesajlar; CLI bayrakları
+- [x] Bölge öğeleri (file null + region rle), initPack REGION_ITEM, pdf clip, preview
+- [x] checks.ts: MIN_GAP / OVERLAP (eğri) / PAGE_MARGIN; cut-stats script; gerçek pack iddiaları (kahve: 13/13 G1, 6–12 anchor, giriş ≤ 0.09 mm)
 
 ## Faz 2 — Araçlar
-- [ ] geometry helpers; pdf-read.ts + compare.ts + testler; pipeline.compareWithReference; CLI compare
-- [ ] pdf.ts seçenekleri (pages, OCG, labels, bleed, spot) + testler
-- [ ] svg.ts, png-encode.ts, export-png.ts, package.ts + testler; CLI build bayrakları; doctor
-- [ ] index.ts export'ları; AGENTS/README/skill
+- [x] geometry helpers; pdf-read.ts + compare.ts + testler; pipeline.compareWithReference; CLI compare
+- [x] pdf.ts seçenekleri (pages, OCG, labels, bleed, spot) + testler
+- [x] svg.ts, png-encode.ts, export-png.ts, package.ts + testler; CLI build bayrakları; doctor
+- [x] index.ts export'ları
+- [ ] AGENTS/README/skill (Faz 5'te tek geçişte)
 
 ## Faz 3 — Web mimarisi
 - [ ] app/store + actions + cut-key + history (coalesce) + presets + sample-pack

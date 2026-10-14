@@ -84,6 +84,55 @@ export function downscaleRaster(r: Raster, f: number): Raster {
   return out;
 }
 
+/** Kapalı çokgenin piksel kapsaması (0–255): alt örnek merkezlerinde çift-tek kuralı, supersample² ortalaması. */
+export function coverageMask(width: number, height: number, flat: Pt[], supersample = 2): Uint8Array {
+  const cov = new Uint8Array(width * height);
+  const n = flat.length, s = supersample, samples = s * s;
+  if (n < 3) return cov;
+  const row = new Uint16Array(width);
+  const xs: number[] = [];
+  for (let y = 0; y < height; y++) {
+    row.fill(0);
+    let any = false;
+    for (let j = 0; j < s; j++) {
+      const sy = y + (j + 0.5) / s;
+      xs.length = 0;
+      for (let i = 0; i < n; i++) {
+        const a = flat[i], b = flat[(i + 1) % n];
+        if ((a.y <= sy) === (b.y <= sy)) continue; // yarı açık kural: kenar bu tarama çizgisini kesmiyor
+        xs.push(a.x + ((sy - a.y) * (b.x - a.x)) / (b.y - a.y));
+      }
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        for (let i = 0; i < s; i++) {
+          const o = (i + 0.5) / s; // alt örnek x + o, [xs[k], xs[k+1]) aralığındaysa içeride
+          const x0 = Math.max(0, Math.ceil(xs[k] - o)), x1 = Math.min(width, Math.ceil(xs[k + 1] - o));
+          for (let x = x0; x < x1; x++) row[x]++;
+          if (x1 > x0) any = true;
+        }
+      }
+    }
+    if (any) for (let x = 0; x < width; x++) cov[y * width + x] = Math.round((row[x] * 255) / samples);
+  }
+  return cov;
+}
+
+/** Alfa kanalını kapsamayla çarpar: kesim silüetinin dışı şeffaflaşır. */
+export function applyCoverage(r: Raster, cov: Uint8Array): void {
+  for (let i = 0, n = r.width * r.height; i < n; i++) r.data[i * 4 + 3] = (r.data[i * 4 + 3] * cov[i]) / 255;
+}
+
+/** Düz rengi, alfası kapsama olan bir katman gibi src-over bindirir. */
+export function fillCoverage(r: Raster, cov: Uint8Array, rgb: [number, number, number]): void {
+  for (let i = 0, n = r.width * r.height; i < n; i++) {
+    const sa = cov[i] / 255;
+    if (!sa) continue;
+    const o = i * 4, da = r.data[o + 3] / 255, oa = sa + da * (1 - sa);
+    for (let c = 0; c < 3; c++) r.data[o + c] = (rgb[c] * sa + r.data[o + c] * da * (1 - sa)) / oa;
+    r.data[o + 3] = oa * 255;
+  }
+}
+
 export function strokePolyline(
   dst: Raster, pts: Pt[], closed: boolean, color: [number, number, number], width: number,
 ): void {
