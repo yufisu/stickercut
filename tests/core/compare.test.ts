@@ -10,7 +10,7 @@ import { makeScene } from '../helpers/scene';
 // 80 × 120 mm sayfa, 800 × 1200 px tasarım → 0.1 mm/px.
 function makePack(ids: string[]): Pack {
   return {
-    version: 2,
+    version: 3,
     page: { widthMm: 80, heightMm: 120 },
     designSize: { widthPx: 800, heightPx: 1200 },
     files: { design: 'tasarim.png', background: 'arka.png' },

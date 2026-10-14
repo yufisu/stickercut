@@ -119,7 +119,11 @@ describe('cli', () => {
     expect(await run(['doctor', pack, '--json'], io)).toBe(0);
     const out = JSON.parse(lines.join('\n'));
     expect(out.items).toHaveLength(4);
-    expect(out.items.every((i: { g1: boolean; lines: number }) => i.g1 && i.lines === 0)).toBe(true);
+    // Eğri sticker'lar G1 ve düz çizgisiz; dikdörtgen baklava 4 köşe noktası ve 4 düz kenar.
+    for (const i of out.items as { file: string; g1: boolean; lines: number; anchors: number }[]) {
+      if (i.file.endsWith('baklava.png')) expect([i.anchors, i.lines]).toEqual([4, 4]);
+      else expect(i.g1 && i.lines === 0).toBe(true);
+    }
     const broken = JSON.parse(readFileSync(pack, 'utf8'));
     broken.items[1].file = 'assets/yok.png';
     writeFileSync(pack, JSON.stringify(broken));

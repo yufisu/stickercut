@@ -150,6 +150,32 @@ describe('stickerCutShape — temizlik, dikdörtgen, uç durumlar', () => {
     expect(stickerCutShape(solid, { ...base, offsetMm: -0.5 }).points[0]).toEqual({ x: 5, y: 5 });
     expect(() => stickerCutShape(solid, { ...base, offsetMm: -6 })).toThrow('İçe ofset');
   });
+  it('şeffaf zeminde düz kenarlı kart (döndürülmüş de olsa) 4 köşe noktası ve düz çizgiyle kesilir', () => {
+    const c = Math.cos(0.2), sn = Math.sin(0.2);
+    const card = raster(400, 400, (x, y) => {
+      const dx = x + 0.5 - 200, dy = y + 0.5 - 200;
+      return Math.abs(dx * c + dy * sn) <= 120 && Math.abs(-dx * sn + dy * c) <= 80 ? 255 : 0;
+    });
+    const s = stickerCutShape(card, { ...base, closingMm: 1, smoothMm: 0.2 });
+    expect(s.points).toHaveLength(4);
+    expect(lines(s.points)).toBe(4);
+    const corner = { x: 200 + 120 * c - 80 * sn, y: 200 + 120 * sn + 80 * c };
+    expect(Math.min(...s.points.map((p) => Math.hypot(p.x - corner.x, p.y - corner.y)))).toBeLessThan(1.5);
+    // 0.5 mm pay: kenarlar 5 px dışarı, köşeler yine sivri
+    const m = stickerCutShape(card, { ...base, offsetMm: 0.5 });
+    expect(m.points).toHaveLength(4);
+    // Eğik kenarda piksel merdiveni yüzünden ≤ 1 çalışma pikseli (burada 0.1 mm) pay.
+    expect(Math.abs(Math.max(...radii(m.points, 200, 200)) - Math.hypot(125, 85))).toBeLessThan(1);
+  });
+  it('yuvarlak köşeli kart dikdörtgene zorlanmaz, köşesini izler', () => {
+    const card = raster(300, 200, (x, y) => {
+      const u = Math.abs(x + 0.5 - 150) - 80, v = Math.abs(y + 0.5 - 100) - 50;
+      return Math.hypot(Math.max(u, 0), Math.max(v, 0)) <= 30 ? 255 : 0;
+    });
+    const s = stickerCutShape(card, base);
+    expect(s.points.length).toBeGreaterThan(4);
+    expect(isG1(s.points)).toBe(true);
+  });
   it('tamamen şeffaf PNG için EMPTY', () => {
     try { stickerCutShape(square(50, () => 0), base); expect.unreachable(); }
     catch (e) { expect((e as StickerError).code).toBe('EMPTY'); }
@@ -183,6 +209,12 @@ describe('cutShapeFromMask / regionOutline', () => {
     const full = createMask(50, 30);
     full.data.fill(1);
     expect(cutShapeFromMask(full, { ...base, rectCornerRadiusMm: 0 }).points).toHaveLength(4);
+    // Kenarında birkaç pikseli eksik (bbox'ı %99 doldurmayan) dikdörtgen bölge de düz kesilir.
+    const ragged = createMask(200, 120);
+    ragged.data.fill(1);
+    for (let y = 0; y < 120; y += 2) ragged.data[y * 200] = 0;
+    const r = cutShapeFromMask(ragged, { ...base, pxPerMm: 20, closingMm: 1, smoothMm: 0.2 });
+    expect(r.points).toHaveLength(4);
     expect(() => cutShapeFromMask(createMask(5, 5), base)).toThrow(/boş/i);
   });
   it('regionOutline kare maskeyi 4 köşeye indirir', () => {

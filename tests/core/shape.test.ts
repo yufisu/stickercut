@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createMask, maskArea, labelComponents, type Mask } from '../../src/core/raster';
 import { signedDistance, squaredDistance, closeMask, openMask } from '../../src/core/distance';
 import {
-  alphaCoverage, selectParts, bridgeParts, traceCrack, isoContour, roundedRect, encodeRle, decodeRle,
+  alphaCoverage, selectParts, bridgeParts, traceCrack, isoContour, roundedRect, encodeRle, decodeRle, fitRectangle, rectFitPath,
 } from '../../src/core/shape';
 import { flattenClosedPath, polygonBounds, type Pt } from '../../src/core/geometry';
 import { paint } from '../helpers/scene';
@@ -183,5 +183,57 @@ describe('rle', () => {
     expect(encodeRle(createMask(3, 2))).toBe('6');
     expect(() => decodeRle('5', 5, 4)).toThrow(/uyuşmuyor/);
     expect(() => decodeRle('!,1', 1, 1)).toThrow(/bozuk/);
+  });
+});
+
+describe('fitRectangle', () => {
+  /** Merkez (cx, cy), w×h, derece cinsinden dönük dikdörtgen; köşe yarıçapı r. */
+  function rectMask(W: number, H: number, cx: number, cy: number, w: number, h: number, deg = 0, r = 0) {
+    const m = createMask(W, H);
+    const c = Math.cos((deg * Math.PI) / 180), s = Math.sin((deg * Math.PI) / 180);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+      const u = Math.abs(dx * c + dy * s) - (w / 2 - r), v = Math.abs(-dx * s + dy * c) - (h / 2 - r);
+      if (Math.hypot(Math.max(u, 0), Math.max(v, 0)) <= r && u <= r && v <= r) m.data[y * W + x] = 1;
+    }
+    return m;
+  }
+  const size = (f: NonNullable<ReturnType<typeof fitRectangle>>) => [f.umax - f.umin, f.vmax - f.vmin].sort((a, b) => a - b);
+
+  it('eksene paralel dikdörtgeni tam piksel kenarlarıyla bulur ve 4 düz köşeye çevirir', () => {
+    const f = fitRectangle(rectMask(300, 200, 150, 100, 200, 120), 2)!;
+    expect(f).not.toBeNull();
+    expect(size(f)).toEqual([120, 200]);
+    const path = rectFitPath(f, 0, 0);
+    expect(path).toHaveLength(4);
+    expect(path.every((p) => !p.handleIn && !p.handleOut)).toBe(true);
+    const b = polygonBounds(path);
+    expect([b.minX, b.minY, b.maxX, b.maxY].map((v) => Math.round(v))).toEqual([50, 40, 250, 160]);
+    const grown = polygonBounds(rectFitPath(f, 5, 0));
+    expect([grown.minX, grown.maxY].map((v) => Math.round(v))).toEqual([45, 165]);
+    expect(rectFitPath(f, 0, 10)).toHaveLength(8);
+  });
+
+  it('döndürülmüş dikdörtgeni de bulur', () => {
+    const f = fitRectangle(rectMask(400, 400, 200, 200, 220, 140, 17), 2)!;
+    expect(f).not.toBeNull();
+    const [a, b] = size(f);
+    expect(a).toBeCloseTo(140, -0.5);
+    expect(b).toBeCloseTo(220, -0.5);
+    const angle = (Math.atan2(f.uy, f.ux) * 180) / Math.PI;
+    expect(Math.min(...[17, 107, -73, -163, 197].map((d) => Math.abs(((angle - d + 540) % 360) - 180)))).toBeLessThan(1.5);
+  });
+
+  it('yuvarlak köşeli kart, daire, girintili ve çıkıntılı şekil dikdörtgen sayılmaz', () => {
+    expect(fitRectangle(rectMask(300, 200, 150, 100, 200, 120, 0, 20), 2)).toBeNull();
+    const disc = createMask(200, 200);
+    for (let y = 0; y < 200; y++) for (let x = 0; x < 200; x++) if (Math.hypot(x - 100, y - 100) < 80) disc.data[y * 200 + x] = 1;
+    expect(fitRectangle(disc, 2)).toBeNull();
+    const notch = rectMask(300, 200, 150, 100, 200, 120);
+    for (let y = 40; y < 52; y++) for (let x = 140; x < 160; x++) notch.data[y * 300 + x] = 0;
+    expect(fitRectangle(notch, 2)).toBeNull();
+    const bump = rectMask(300, 200, 150, 100, 200, 120);
+    for (let y = 30; y < 40; y++) for (let x = 140; x < 160; x++) bump.data[y * 300 + x] = 1;
+    expect(fitRectangle(bump, 2)).toBeNull();
   });
 });

@@ -14,7 +14,7 @@ const px = (r: { width: number; data: ArrayLike<number> }, x: number, y: number)
 function circlePack(whiteBorder: boolean) {
   const raster = paint(400, 400, (x, y) => ((x + 0.5 - 200) ** 2 + (y + 0.5 - 200) ** 2 <= 180 ** 2 ? [30, 90, 200, 255] : null));
   const pack: Pack = {
-    version: 2, page: { widthMm: 80, heightMm: 120 }, designSize: { widthPx: 800, heightPx: 1200 },
+    version: 3, page: { widthMm: 80, heightMm: 120 }, designSize: { widthPx: 800, heightPx: 1200 },
     files: { design: 'tasarim.png', background: 'arka.png' },
     defaults: { ...DEFAULT_SETTINGS, offsetMm: 1, whiteBorder },
     items: [{ id: 'i1', file: 'mavi.png', x: 220, y: 260, scale: 0.5, rotationDeg: 0, printOnly: false, needsReview: false, matchScore: null, overrides: {} }],

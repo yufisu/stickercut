@@ -34,7 +34,7 @@ const readOne = async (content: PageSpec['content'], setup?: PageSpec['setup'], 
 const paths = async (...args: Parameters<typeof readOne>) => (await readOne(...args)).pages[0].paths;
 
 const makePack = (widthMm: number, heightMm: number): Pack => ({
-  version: 2, page: { widthMm, heightMm }, designSize: { widthPx: 800, heightPx: 1200 },
+  version: 3, page: { widthMm, heightMm }, designSize: { widthPx: 800, heightPx: 1200 },
   files: { design: 'tasarim.png', background: 'arka.png' }, defaults: { ...DEFAULT_SETTINGS }, items: [],
 });
 const TRI = '10 10 m 50 10 l 50 50 l h S';

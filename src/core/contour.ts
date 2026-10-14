@@ -2,6 +2,7 @@ import { type Mask, type Raster, fillHoles, largestComponent, labelComponents, m
 import { signedDistance, thresholdField, closeMask, squaredDistance } from './distance';
 import {
   alphaCoverage, coverageFromMask, selectParts, bridgeParts, isoContour, roundedRect, maskOutline, decodeRle,
+  fitRectangle, rectFitPath,
 } from './shape';
 import { transformPoints, flattenClosedPath, type Pt, type Affine } from './geometry';
 import type { RegionSource } from './project';
@@ -17,7 +18,7 @@ export interface CutShapeOptions {
   closingMm: number;
   /** Dışbükey köşe yuvarlama; yalnızca max(0, offset)'ten büyükse etkili. */
   cornerRadiusMm: number;
-  /** Opak PNG dikdörtgeninin köşe yarıçapı. */
+  /** Dikdörtgen şekillerin (opak PNG, kart, fotoğraf) köşe yarıçapı; 0 = 4 sivri köşe. */
   rectCornerRadiusMm: number;
   smoothMm: number;
   /** Fit toleransı (en büyük sapma). */
@@ -177,6 +178,22 @@ function sampleField(field: Float32Array, w: number, h: number, x: number, y: nu
   return (f00 * (1 - fx) + f10 * fx) * (1 - fy) + (f01 * (1 - fx) + f11 * fx) * fy;
 }
 
+/** Kesim yolunun çizime göre işaretli uzaklığı (içeride negatif), çalışma pikselinde ölçülür. */
+function measureClearance(art: Mask, path: Pt[], grid: WorkGrid, o: CutShapeOptions): Clearance {
+  if (!(o.tightMm > 0) || path.length < 3) return { minMm: Infinity, insideRatio: 0, worst: null };
+  const { width: w, height: h } = art;
+  const artSdf = signedDistance(art);
+  // Düz kısımlarda seyrek kalmasın diye 1 px adımla yeniden örnekle (ince çıkıntılar atlanmasın).
+  const flat = resampleClosed(flattenClosedPath(path, 0.25), 1);
+  let inside = 0, min = Infinity, worst: Pt | null = null;
+  for (const p of flat) {
+    const d = sampleField(artSdf, w, h, p.x, p.y);
+    if (d < 0) inside++;
+    if (d < min) { min = d; worst = p; }
+  }
+  return { minMm: min / grid.pxPerMmW, insideRatio: flat.length ? inside / flat.length : 0, worst };
+}
+
 /** Çalışma ızgarasındaki (pad'li) maskeden kesim yolu üretir; sonuç çalışma pikselindedir. */
 function cutFromWork(m0: Mask, grid: WorkGrid, o: CutShapeOptions, started: number): CutShape {
   const { width: w, height: h } = m0;
@@ -184,6 +201,19 @@ function cutFromWork(m0: Mask, grid: WorkGrid, o: CutShapeOptions, started: numb
   const parts = selectParts(m0, o.minPartRatio);
   if (!parts.kept) throw new StickerError('EMPTY', 'Bu PNG tamamen şeffaf, kesilecek bir şekil yok.');
   const art = fillHoles(parts.mask); // çizim silüeti
+  const offsetPx = px(o.offsetMm);
+
+  // Düz kenarlı dikdörtgen (kart, fotoğraf; döndürülmüş de olabilir): 4 köşe noktası, düz kenar.
+  const rect = fitRectangle(art, Math.max(px(0.15), 1.5));
+  if (rect) {
+    const path = rectFitPath(rect, offsetPx, px(o.rectCornerRadiusMm));
+    if (!path.length) throw new StickerError('OFFSET_EMPTY', 'İçe ofset sticker boyutundan büyük; kesim çizgisi oluşturulamadı.');
+    return {
+      points: path, extraPartsRatio: parts.droppedRatio, partsBridged: 0, clearance: measureClearance(art, path, grid, o),
+      stats: { anchors: path.length, lines: countLines(path), workSize: Math.max(w, h), ms: performance.now() - started },
+    };
+  }
+
   let dropped = parts.droppedRatio, bridged = 0;
   const closingPx = px(o.closingMm);
   let shape = closingPx >= 0.5 ? closeMask(art, closingPx) : art;
@@ -201,7 +231,7 @@ function cutFromWork(m0: Mask, grid: WorkGrid, o: CutShapeOptions, started: numb
   }
   shape = fillHoles(shape);
   const sdf = signedDistance(shape);
-  const offsetPx = px(o.offsetMm), cornerPx = px(o.cornerRadiusMm);
+  const cornerPx = px(o.cornerRadiusMm);
   let iso;
   if (cornerPx > Math.max(0, offsetPx) + 0.5) {
     const eroded = thresholdField(sdf, w, h, offsetPx - cornerPx);
@@ -231,22 +261,8 @@ function cutFromWork(m0: Mask, grid: WorkGrid, o: CutShapeOptions, started: numb
   const tolerance = Math.max(px(o.simplifyMm), 0.3);
   const path = fitG1Closed(smooth, tangents, tolerance, corners);
 
-  // Çizime yakınlık: işaretli uzaklık (içeride negatif)
-  let clearance: Clearance = { minMm: Infinity, insideRatio: 0, worst: null };
-  if (o.tightMm > 0 && path.length >= 3) {
-    const artSdf = signedDistance(art);
-    // Düz kısımlarda seyrek kalmasın diye 1 px adımla yeniden örnekle (ince çıkıntılar atlanmasın).
-    const flat = resampleClosed(flattenClosedPath(path, 0.25), 1);
-    let inside = 0, min = Infinity, worst: Pt | null = null;
-    for (const p of flat) {
-      const d = sampleField(artSdf, w, h, p.x, p.y);
-      if (d < 0) inside++;
-      if (d < min) { min = d; worst = p; }
-    }
-    clearance = { minMm: min / grid.pxPerMmW, insideRatio: flat.length ? inside / flat.length : 0, worst };
-  }
   return {
-    points: path, extraPartsRatio, partsBridged: bridged, clearance,
+    points: path, extraPartsRatio, partsBridged: bridged, clearance: measureClearance(art, path, grid, o),
     stats: { anchors: path.length, lines: countLines(path), workSize: Math.max(w, h), ms: performance.now() - started },
   };
 }
@@ -260,7 +276,7 @@ function toSource(shape: CutShape, grid: WorkGrid): CutShape {
   };
 }
 
-/** Sticker PNG'sinden kesim yolu (kaynak raster pikselinde). Tamamen opak PNG → (yuvarlak köşeli) dikdörtgen. */
+/** Sticker PNG'sinden kesim yolu (kaynak raster pikselinde). Tamamen opak PNG ya da dikdörtgen silüet → dikdörtgen. */
 export function stickerCutShape(r: Raster, o: CutShapeOptions): CutShape {
   const started = performance.now();
   if (isFullyOpaque(r)) return rectShape(r.width, r.height, o, started);

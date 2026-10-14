@@ -10,7 +10,7 @@ Tam tasarım, stickersız arka plan ve tek tek şeffaf sticker PNG'lerinden, Ill
 
 1. **Kurulum:** En kısa yol: yalnızca sticker dolu sayfayı bırak (**tek sayfa modu**, aşağıya bak). Daha kesin sonuç için sticker'sız arka planı ve tek tek sticker PNG'lerini de ekle. PNG'leri bırak ya da *Dosyalar'dan seç* (iPad'de *Fotoğraflar'dan* seçersen dosya adları `IMG_…` olur; rolleri kartlardan düzelt). Aynı boyutlu iki opak PNG tam tasarım ve arka plan olarak otomatik tanınır. Sayfa ölçüsünü ve kesim stilini (**Yapışık**, **0.5 mm pay**, **Beyaz kenar 1 mm**) seç, **Yerleştir**'e dokun. İlk kez deniyorsan *Örnek pack'i dene*.
 2. **Editör:** Sol araç çubuğu (seç, gez, sticker ekle, bölge, ölçü), mm cetvelli tuval, altta katman listesi, sağda sekmeli denetçi (*Sticker · Sayfa · Kesim · Kontrol*), altta durum çubuğu. Sürükle-taşı, köşeden ölçekle, üst tutamaçla döndür; Shift ile çoklu seçim, ok tuşlarıyla 0.1 mm it, hizalama/dağıtma düğmeleri. Hizalama kılavuzlarına yapışır (Alt kapatır). Görünüm: *Düzenle · Kesim sayfası · Baskı önizleme*. iPad'de denetçi alt sayfa, katmanlar soldan kayan panel; iki parmakla yakınlaştır.
-3. **Kesim ayarları:** Ofset (mm, işaretli), sıkılık (dar girintileri köprüler), yumuşatma, sadeleştirme toleransı, köşe koruma, dışbükey köşe yuvarlama, opak PNG köşe yarıçapı, parça köprüleme, alfa eşiği. Her ayar sticker başına da ezilebilir.
+3. **Kesim ayarları:** Ofset (mm, işaretli), sıkılık (dar girintileri köprüler), yumuşatma, sadeleştirme toleransı, köşe koruma, dışbükey köşe yuvarlama, dikdörtgen köşe yarıçapı (varsayılan 0: sivri), parça köprüleme, alfa eşiği. Her ayar sticker başına da ezilebilir.
 4. **Kontrol:** Belirsiz yerleşimler, eşleşmeyen bölgeler (tuvalde numaralı işaret; *Bu bölgeye yerleştir* ya da *Yok say*), kullanılmayan PNG'ler, kesimler arası en az boşluk, sayfa kenarı, çakışma ve çizime girme uyarıları. Elle hazırlanmış bir Illustrator PDF'ini **referans** olarak yükleyip çizgileri üst üste ve ölçülerle karşılaştırabilirsin.
 5. **Dışa aktarma:** PDF (Baskı/Kesim OCG katmanlı, isteğe bağlı spot renk `CutContour` ve taşma payı), yalnızca kesim PDF'i, SVG (mm), kesim silüetine göre kırpılmış sticker PNG'leri (.zip), baskıcı paketi (.zip + Türkçe README) ve proje .zip'i. Proje bu tarayıcıda otomatik kaydedilir; `?` ile kısayol listesi.
 
@@ -40,7 +40,7 @@ Klasörde birden çok pack varsa `init` için `--design`, `--background` ve `-o`
 
 - Kesim yolları alt piksel hassasiyetli iso-konturdan (işaretli uzaklık alanı) çıkar, ardından Gauss yumuşatma ve sabit teğetli en küçük kareler kübik Bézier fit ile tamamen eğri, G1 sürekli ve az anchor'lı hale gelir (fincan ≈ 10 anchor). Düz segment yalnızca köşe koruma açıkken üretilir.
 - Varsayılan ofset 0 mm'dir: çizgi çizimin alfa kenarını izler ve ölçümlerde çizime en fazla ~0.1 mm girer. Elle hazırlanmış Illustrator referansları ±1 mm salınır; `compare` bu farkı ölçer.
-- Şeffaflığı olmayan PNG'ler (fotoğraf/washi) yuvarlak köşeli dikdörtgen kesilir.
+- Düz kenarlı dikdörtgen ve kareler (şeffaflığı olmayan fotoğraf/washi PNG'leri, sayfadaki kartlar; döndürülmüş olsa da) 4 köşe noktası ve düz kenarla, sivri köşeli kesilir. Köşe yuvarlamak istersen Kesim sekmesinde *Dikdörtgen köşe yarıçapı*'nı aç. Yuvarlak köşeli çizilmiş kartlar dikdörtgene zorlanmaz, köşesini izler.
 
 ## Geliştirme
 

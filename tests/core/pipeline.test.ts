@@ -252,9 +252,9 @@ describe('computeCuts', () => {
     pack!.items[2].file = 'opak.png';
     const { cuts, messages } = computeCuts(pack!, assetsOf([...files, opaque]));
     expect(cuts.has(pack!.items[0].id)).toBe(false);
-    expect(cuts.get(pack!.items[2].id)).toHaveLength(8); // yuvarlak köşeli dikdörtgen (varsayılan 1.5 mm)
-    pack!.items[2].overrides.rectCornerRadiusMm = 0;
-    expect(computeCuts(pack!, assetsOf([...files, opaque])).cuts.get(pack!.items[2].id)).toHaveLength(4);
+    expect(cuts.get(pack!.items[2].id)).toHaveLength(4); // sivri köşeli dikdörtgen (varsayılan 0 mm)
+    pack!.items[2].overrides.rectCornerRadiusMm = 1.5;
+    expect(computeCuts(pack!, assetsOf([...files, opaque])).cuts.get(pack!.items[2].id)).toHaveLength(8);
     expect(messages.filter((m) => m.level === 'error').map((m) => m.code)).toEqual(['MISSING_FILE']);
   });
 });

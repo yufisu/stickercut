@@ -91,7 +91,7 @@ describe('dosya aksiyonları', () => {
     expect(engine.init).not.toHaveBeenCalled();
     store.files.value.get('design.png')!.role = 'design';
     const pack = {
-      version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
+      version: 3, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
       files: { design: 'design.png', background: 'background.png' }, defaults: {} as never,
       items: [{ id: 'i1', file: 'sticker.png', x: 50, y: 50, scale: 0.5, rotationDeg: 0, printOnly: false, needsReview: false, matchScore: 0.9, overrides: {} }],
     };
@@ -104,7 +104,7 @@ describe('dosya aksiyonları', () => {
   it('place: arka plan yoksa tek sayfa modunda çalışır ve üretilen arka planı mağazaya ekler', async () => {
     store.files.value = new Map([['sayfa.png', entry('sayfa.png', 'design')]]);
     const pack = {
-      version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
+      version: 3, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
       files: { design: 'sayfa.png', background: 'otomatik arka plan.png' }, defaults: {} as never, items: [],
     };
     vi.mocked(engine.init).mockResolvedValue({
@@ -173,7 +173,7 @@ describe('dosya aksiyonları', () => {
 
   it('addNewSticker PDF’i fiziksel ölçüsüyle yerleştirir ve tasarım dosyasının üzerine yazmaz', async () => {
     store.doc.value = {
-      version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 800, heightPx: 800 },
+      version: 3, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 800, heightPx: 800 },
       files: { design: 'design.png', background: 'background.png' }, defaults: {} as never, items: [],
     } as unknown as NonNullable<typeof store.doc.value>;
     vi.mocked(rasterizePdf).mockResolvedValueOnce([{ page: 1, kind: 'art', widthMm: 30, heightMm: 30, png: new Uint8Array([3]) }]);
@@ -198,7 +198,7 @@ describe('dosya aksiyonları', () => {
 
   it('restore kayıtlı dosyaları ve belgeyi geri yükler', async () => {
     const packJson = JSON.stringify({
-      version: 2, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
+      version: 3, page: { widthMm: 80, heightMm: 80 }, designSize: { widthPx: 100, heightPx: 100 },
       files: { design: 'design.png', background: 'background.png' }, items: [],
     });
     vi.mocked(storage.load).mockResolvedValueOnce({

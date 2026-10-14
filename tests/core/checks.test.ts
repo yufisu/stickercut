@@ -4,7 +4,7 @@ import { parsePack } from '../../src/core/project';
 import type { Pt } from '../../src/core/geometry';
 
 const pack = () => parsePack(JSON.stringify({
-  version: 2, page: { widthMm: 80, heightMm: 120 }, designSize: { widthPx: 800, heightPx: 1200 },
+  version: 3, page: { widthMm: 80, heightMm: 120 }, designSize: { widthPx: 800, heightPx: 1200 },
   files: { design: 'd.png', background: 'b.png' }, items: [],
 }));
 /** 1 tasarım px = 0.1 mm. */

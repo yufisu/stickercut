@@ -96,7 +96,7 @@ describe('camera', () => {
 
   it('designToMm, mmPerDesignPx ile aynı çarpanları kullanır; mmToDesign tersidir', () => {
     const pack: Pack = {
-      version: 2, page: { widthMm: 80, heightMm: 140 }, designSize: { widthPx: 1000, heightPx: 2000 },
+      version: 3, page: { widthMm: 80, heightMm: 140 }, designSize: { widthPx: 1000, heightPx: 2000 },
       files: { design: 'd.png', background: 'b.png' }, defaults: DEFAULT_SETTINGS, items: [],
     };
     const m = designToMm(pack), k = mmPerDesignPx(pack);

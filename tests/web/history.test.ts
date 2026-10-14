@@ -3,7 +3,7 @@ import { parsePack } from '../../src/core/project';
 import { EditHistory } from '../../web/src/app/history';
 
 const makePack = () => parsePack(JSON.stringify({
-  version: 2,
+  version: 3,
   page: { widthMm: 80, heightMm: 120 },
   designSize: { widthPx: 800, heightPx: 1200 },
   files: { design: 'pack.png', background: 'background.png' },

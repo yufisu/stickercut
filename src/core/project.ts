@@ -34,7 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   strokeWidthPt: 1,
   closingMm: 1,
   cornerRadiusMm: 0,
-  rectCornerRadiusMm: 1.5,
+  rectCornerRadiusMm: 0,
   smoothMm: 0.2,
   simplifyMm: 0.06,
   cornerAngleDeg: 0,
@@ -79,8 +79,11 @@ export function itemLabel(i: Item): string {
   return i.file === null ? `bölge ${i.id}` : (i.file.split('/').pop() ?? i.file);
 }
 
+/** v3: dikdörtgen köşe yarıçapı varsayılanı 1.5 → 0 mm (düz kenarlı şekiller sivri köşeli kesilir). */
+export const PACK_VERSION = 3;
+
 export interface Pack {
-  version: 2;
+  version: 3;
   page: { widthMm: number; heightMm: number };
   designSize: { widthPx: number; heightPx: number };
   files: { design: string; background: string };
@@ -154,7 +157,7 @@ export function parsePack(text: string): Pack {
   try { raw = JSON.parse(text); } catch (e) { throw new PackError([`JSON okunamadı: ${(e as Error).message}`]); }
   const problems: string[] = [];
   if (!isObj(raw)) throw new PackError(['Kök bir nesne olmalı']);
-  if (raw.version !== 1 && raw.version !== 2) problems.push('version 1 ya da 2 olmalı');
+  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3) problems.push('version 1, 2 ya da 3 olmalı');
   const page = isObj(raw.page) ? raw.page : {};
   const size = isObj(raw.designSize) ? raw.designSize : {};
   const files = isObj(raw.files) ? raw.files : {};
@@ -199,13 +202,15 @@ export function parsePack(text: string): Pack {
   });
   if (problems.length) throw new PackError(problems);
   const pack: Pack = {
-    version: 2,
+    version: 3,
     page: { widthMm: page.widthMm as number, heightMm: page.heightMm as number },
     designSize: { widthPx: size.widthPx as number, heightPx: size.heightPx as number },
     files: { design: nfc(files.design as string), background: nfc(files.background as string) },
     defaults: { ...DEFAULT_SETTINGS, ...migrateSettings(raw.defaults) },
     items: [],
   };
+  // v3 öncesinde 1.5 mm yalnızca varsayılandı; eski kayıtlar da dikdörtgenleri sivri köşeyle kessin.
+  if (raw.version !== 3 && pack.defaults.rectCornerRadiusMm === 1.5) pack.defaults.rectCornerRadiusMm = DEFAULT_SETTINGS.rectCornerRadiusMm;
   for (const item of items) {
     if (!item.id) item.id = nextItemId(pack);
     pack.items.push(item);
@@ -214,5 +219,5 @@ export function parsePack(text: string): Pack {
 }
 
 export function serializePack(pack: Pack): string {
-  return JSON.stringify({ ...pack, version: 2 }, null, 2) + '\n';
+  return JSON.stringify({ ...pack, version: PACK_VERSION }, null, 2) + '\n';
 }

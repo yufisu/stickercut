@@ -120,7 +120,7 @@ export function* initPackSteps(files: LoadedFile[], opts: InitOptions = {}): Gen
   // Analiz rasteri küçültülmüşse bölge koordinatlarını orijinal tasarım pikseline çevir.
   const k = design.width / design.raster.width;
   const pack: Pack = {
-    version: 2,
+    version: 3,
     page: { widthMm, heightMm },
     designSize: { widthPx: design.width, heightPx: design.height },
     files: { design: design.name, background: background.name },

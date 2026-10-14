@@ -66,16 +66,25 @@ describe('project', () => {
     expect(nextItemId(p)).toBe('i2');
   });
 
-  it('v1 smoothing ayarını smoothMm’ye taşır, bilinmeyen alanları atar, sürümü 2 yapar', () => {
+  it('v1 smoothing ayarını smoothMm’ye taşır, bilinmeyen alanları atar, sürümü 3 yapar', () => {
     const v1 = { ...minimal, defaults: { smoothing: 0.5, offsetMm: 1, junk: 3 }, items: [{ ...minimal.items[0], overrides: { smoothing: 1, simplifyMm: 0.1 } }] };
     const p = parsePack(JSON.stringify(v1));
-    expect(p.version).toBe(2);
+    expect(p.version).toBe(3);
     expect(p.defaults.smoothMm).toBe(0.2);
     expect(p.defaults.offsetMm).toBe(1);
     expect(p.defaults.closingMm).toBe(DEFAULT_SETTINGS.closingMm);
     expect((p.defaults as unknown as Record<string, unknown>).junk).toBeUndefined();
     expect(p.items[0].overrides).toEqual({ smoothMm: 0.4, simplifyMm: 0.1 });
-    expect(JSON.parse(serializePack(p)).version).toBe(2);
+    expect(JSON.parse(serializePack(p)).version).toBe(3);
+  });
+
+  it('v3 öncesi kayıtta eski varsayılan 1.5 mm dikdörtgen köşesi 0 olur; v3 ve elle seçilmiş değerler korunur', () => {
+    const at = (version: number, r: number) => parsePack(JSON.stringify({ ...minimal, version, defaults: { rectCornerRadiusMm: r } })).defaults.rectCornerRadiusMm;
+    expect(DEFAULT_SETTINGS.rectCornerRadiusMm).toBe(0);
+    expect(at(2, 1.5)).toBe(0);
+    expect(at(1, 1.5)).toBe(0);
+    expect(at(2, 2)).toBe(2);
+    expect(at(3, 1.5)).toBe(1.5);
   });
 
   it('bölge öğesi: file null + geçerli region kabul edilir, bozuk rle reddedilir', () => {

@@ -1,6 +1,6 @@
 import { type Mask, type Raster, createMask, labelComponents, largestComponent } from './raster';
 import { squaredDistance, closeMask, thresholdField } from './distance';
-import type { Pt } from './geometry';
+import type { Pt, Coord } from './geometry';
 
 /**
  * Raster şekil aşaması: alfa → kapsama maskesi → parça seçimi/köprüleme → uzaklık alanı → alt piksel kontur.
@@ -175,6 +175,99 @@ export function coverageFromMask(m: Mask, f: number, pad: number): Mask {
     }
   }
   return out;
+}
+
+/** Kenar ekseni (ux, uy), dik eksen (-uy, ux) ve bu eksenlerde [umin, umax] × [vmin, vmax]. */
+export interface RectFit { ux: number; uy: number; umin: number; umax: number; vmin: number; vmax: number }
+
+function convexHull(pts: [number, number][]): [number, number][] {
+  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: [number, number][] = [], upper: [number, number][] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+/**
+ * Silüet düz kenarlı bir dikdörtgense (döndürülmüş olabilir) en küçük alanlı çevreleyen dikdörtgeni döndürür, değilse null.
+ * Ölçüt: alan dikdörtgenin ≥ %97'si ve satır/sütun uç piksellerinin hepsi dikdörtgen kenarına `tolPx`'ten yakın.
+ * Yuvarlak köşeli kartlar (köşede 0.29·r sapma) ve girintili şekiller bu yüzden reddedilir.
+ */
+export function fitRectangle(m: Mask, tolPx: number): RectFit | null {
+  const { width: w, height: h, data } = m;
+  const rowMin = new Int32Array(h).fill(-1), rowMax = new Int32Array(h).fill(-1);
+  const colMin = new Int32Array(w).fill(-1), colMax = new Int32Array(w).fill(-1);
+  let area = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!data[y * w + x]) continue;
+      area++;
+      if (rowMin[y] < 0) rowMin[y] = x;
+      rowMax[y] = x;
+      if (colMin[x] < 0) colMin[x] = y;
+      colMax[x] = y;
+    }
+  }
+  if (area < 64) return null;
+  // Piksel karelerinin köşeleri: her satırın uç piksellerinin dış köşeleri gövdeyi belirler.
+  const pts: [number, number][] = [];
+  for (let y = 0; y < h; y++) {
+    if (rowMin[y] < 0) continue;
+    pts.push([rowMin[y], y], [rowMin[y], y + 1], [rowMax[y] + 1, y], [rowMax[y] + 1, y + 1]);
+  }
+  const hull = convexHull(pts);
+  if (hull.length < 3) return null;
+  let best: RectFit | null = null, bestArea = Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len === 0) continue;
+    const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+    let umin = Infinity, umax = -Infinity, vmin = Infinity, vmax = -Infinity;
+    for (const [x, y] of hull) {
+      const u = x * ux + y * uy, v = -x * uy + y * ux;
+      if (u < umin) umin = u; if (u > umax) umax = u;
+      if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+    }
+    const rectArea = (umax - umin) * (vmax - vmin);
+    if (rectArea < bestArea - 1e-9) { bestArea = rectArea; best = { ux, uy, umin, umax, vmin, vmax }; }
+  }
+  if (!best || area < 0.97 * bestArea) return null;
+  const { ux, uy, umin, umax, vmin, vmax } = best;
+  // Piksel merkezi kenardan 0.5 px (eğik kenarda merdivenle ~0.7 px) içeride durur.
+  const limit = tolPx + 0.75;
+  const off = (x: number, y: number) => {
+    const cx = x + 0.5, cy = y + 0.5;
+    const u = cx * ux + cy * uy, v = -cx * uy + cy * ux;
+    return Math.min(u - umin, umax - u, v - vmin, vmax - v);
+  };
+  for (let y = 0; y < h; y++) if (rowMin[y] >= 0 && (off(rowMin[y], y) > limit || off(rowMax[y], y) > limit)) return null;
+  for (let x = 0; x < w; x++) if (colMin[x] >= 0 && (off(x, colMin[x]) > limit || off(x, colMax[x]) > limit)) return null;
+  return best;
+}
+
+/** Bulunan dikdörtgenin kesim yolu: `offset` kadar genişler, `radius` 0 ise 4 sivri köşe ve düz kenar. */
+export function rectFitPath(r: RectFit, offset: number, radius: number): Pt[] {
+  const local = roundedRect(r.umax - r.umin, r.vmax - r.vmin, offset, radius);
+  // yerel (lx, ly) → u = umin + lx, v = vmin + ly → x = u·ux − v·uy, y = u·uy + v·ux
+  const map = (p: Coord): Coord => {
+    const u = r.umin + p.x, v = r.vmin + p.y;
+    return { x: u * r.ux - v * r.uy, y: u * r.uy + v * r.ux };
+  };
+  return local.map((p) => ({
+    ...map(p),
+    ...(p.handleIn ? { handleIn: map(p.handleIn) } : {}),
+    ...(p.handleOut ? { handleOut: map(p.handleOut) } : {}),
+  }));
 }
 
 const KAPPA = 0.5522847498;

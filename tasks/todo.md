@@ -73,6 +73,17 @@ Amaç: Kurulumda ve editörde PNG gibi PDF (ve PDF uyumlu `.ai`) yüklenebilsin.
 - [x] Testler: actions (4 yeni), e2e Chromium + iPad WebKit (iki sayfalı PDF → tek sayfa modu → PDF)
 - [x] Gerçek PDF'ler tarayıcıda: kahve (17 şekil), aero (22), cinefil 1 (48/48 hazır), ginger (12), seal 30 mm (1); `kahve pack.ai` açılıyor; `aero pack kesim.pdf` anlaşılır uyarı. Okuma ≈ 1 s, yerleştirme 2–3.5 s. WebKit'te kahve aynı sonuç.
 
+## Dikdörtgenler sivri köşeli (14 Ekim 2026, tamamlandı)
+
+Kullanıcı: "dümdüz dikdörtgen kare olan şeyler 4 kesim noktasıyla oluşmalı", oval köşe istenmiyor.
+
+- [x] `fitRectangle` (shape.ts): dışbükey gövde + en küçük alanlı dikdörtgen; alan ≥ %97 ve satır/sütun uç pikselleri kenara ≤ max(0.15 mm, 1.5 px). Yuvarlak köşeli kart, daire, girinti, çıkıntı reddedilir.
+- [x] `cutFromWork`: dikdörtgen silüet → `rectFitPath` (ofsetle genişler, 4 köşe, düz kenar); döndürülmüş kartlar dahil
+- [x] `rectCornerRadiusMm` varsayılanı 1.5 → 0; şema v3, eski kayıtlardaki 1.5 varsayılanı 0'a taşınır
+- [x] Ayar adı "Dikdörtgen köşe yarıçapı"; README/AGENTS
+- [x] Testler: shape (3), contour (3), project (1), pipeline ve CLI doctor beklentileri
+- [x] Gerçek sayfalar: sinema sayfası tek dosya modunda 9 kart 4 köşeli, çoklu modda 10/11 sticker 4 köşeli; kahve, çay, örgü, aero ve cinefil'de yanlış dikdörtgen yok (0)
+
 ## Gözden geçirme (14 Ekim 2026)
 - Motor: 13/13 kahve kesimi G1, 6–12 anchor, düz segment yok, çizime giriş ≤ 0.09 mm; sticker başına 80–520 ms (Mac, node).
 - Araçlar: bölge öğeleri (PNG'siz), compare/doctor, OCG katmanlı/spot renkli PDF, SVG, sticker PNG zip, baskıcı paketi.

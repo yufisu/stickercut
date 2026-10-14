@@ -15,7 +15,7 @@ Sayfa ölçüsü bilinmiyorsa mevcut baskı PDF'inin sayfa ölçüsünü incele 
 
 ## Ayarlar (pack.json `defaults`, öğe başına `overrides`)
 
-`offsetMm` (işaretli), `closingMm` (sıkılık), `cornerRadiusMm`, `rectCornerRadiusMm`, `smoothMm`, `simplifyMm`, `cornerAngleDeg` (0 = kapalı), `bridgeMm`, `minPartRatio`, `minGapMm`, `tightMm`, `whiteBorder`, `strokeWidthPt`, `alphaThreshold`. v1 dosyalardaki `smoothing` otomatik taşınır.
+`offsetMm` (işaretli), `closingMm` (sıkılık), `cornerRadiusMm`, `rectCornerRadiusMm`, `smoothMm`, `simplifyMm`, `cornerAngleDeg` (0 = kapalı), `bridgeMm`, `minPartRatio`, `minGapMm`, `tightMm`, `whiteBorder`, `strokeWidthPt`, `alphaThreshold`. v1 dosyalardaki `smoothing` otomatik taşınır. Şema v3: `rectCornerRadiusMm` varsayılanı 0 (eski kayıtlardaki 1.5 varsayılanı 0'a taşınır). Silüeti düz kenarlı dikdörtgen olan her şekil (`fitRectangle`, döndürülmüş dahil) 4 köşe noktası ve düz kenarla kesilir; bu yüzden `doctor` çıktısında bu öğeler `g1: false, lines: 4` görünür ve bu doğrudur.
 
 ## Geliştirme
 

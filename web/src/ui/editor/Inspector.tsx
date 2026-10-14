@@ -209,7 +209,7 @@ function CutTab() {
         <Slider label="Sadeleştirme (sapma toleransı)" value={d.simplifyMm} min={0} max={0.5} step={0.01} digits={2} onInput={set('simplifyMm')} {...group} hint="Düşük değer daha fazla nokta, daha sadık çizgi." />
         <Slider label="Köşe koruma" value={d.cornerAngleDeg} min={0} max={180} step={5} unit="°" digits={0} onInput={set('cornerAngleDeg')} {...group} hint="0° kapalı: her şey yumuşak eğri. Açınca bu açıdan sivri köşeler sivri kalır." />
         <Slider label="Dışbükey köşe yuvarlama" value={d.cornerRadiusMm} min={0} max={3} step={0.1} digits={1} onInput={set('cornerRadiusMm')} {...group} hint="Yalnızca ofsetten büyükse etkili; ince çıkıntıları da siler." />
-        <Slider label="Opak PNG köşe yarıçapı" value={d.rectCornerRadiusMm} min={0} max={6} step={0.5} digits={1} onInput={set('rectCornerRadiusMm')} {...group} hint="Şeffaflığı olmayan (fotoğraf/washi) sticker'lar dikdörtgen kesilir." />
+        <Slider label="Dikdörtgen köşe yarıçapı" value={d.rectCornerRadiusMm} min={0} max={6} step={0.5} digits={1} onInput={set('rectCornerRadiusMm')} {...group} hint="Düz kenarlı dikdörtgen ve kareler (kart, fotoğraf, washi) 4 köşe noktasıyla kesilir. 0 = sivri köşe." />
         <Slider label="Parça köprüleme mesafesi" value={d.bridgeMm} min={0} max={10} step={0.5} digits={1} onInput={set('bridgeMm')} {...group} hint="Ana parçaya bu kadar yakın ayrı parçalar tek kesimde birleşir; 0 yalnızca en büyük parça." />
         <Slider label="Alfa eşiği" value={d.alphaThreshold} min={1} max={254} step={1} unit="" digits={0} onInput={set('alphaThreshold')} {...group} hint="Yarı saydam kenarların nereden kesileceği." />
       </section>
